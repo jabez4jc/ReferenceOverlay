@@ -14,7 +14,7 @@
       • Wirecast → Add as Window Capture source; apply Chroma Key filter
       • OBS     → Add as Window Capture or Browser source; apply Chroma Key
   -->
-  <title>Overlay — Output</title>
+  <title id="output-title">Overlay — Output</title>
   <link rel="icon" type="image/svg+xml" href="favicon.svg" />
   <link rel="icon" type="image/png" href="assets/brand/favicon-32.png" sizes="32x32" />
   <link rel="apple-touch-icon" href="assets/brand/apple-touch-icon.png" />
@@ -31,6 +31,9 @@
     Its background-color is the chroma key colour.
     Nothing here should be touched — all rendering is done by output.js.
   -->
+  <!-- Session watermark — visible to operator, sits outside chroma-keyed content -->
+  <div class="session-watermark" id="session-watermark"></div>
+
   <div class="stage" id="stage">
 
     <!-- Standard lower-third (hidden when custom template is active) -->

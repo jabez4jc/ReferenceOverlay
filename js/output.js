@@ -62,6 +62,12 @@ window.addEventListener('storage', e => {
 
 // ── DOMContentLoaded ──────────────────────────────────────────────────────────
 window.addEventListener('DOMContentLoaded', () => {
+  // Label output window with session ID for operator reference
+  const watermark = document.getElementById('session-watermark');
+  if (watermark) watermark.textContent = '#' + SESSION_ID;
+  const titleEl = document.getElementById('output-title');
+  if (titleEl) titleEl.textContent = 'Output — #' + SESSION_ID;
+
   applyInitialSettings();
   restoreLastState();
   initWebSocket();
@@ -213,7 +219,9 @@ function applySettings(s) {
   if (s.font) {
     ltLine1.style.fontFamily = s.font;
     ltLine2.style.fontFamily = s.font;
-    if (ltText) ltText.style.fontFamily = s.font;
+    if (ltText)      ltText.style.fontFamily      = s.font;
+    if (tickerText)  tickerText.style.fontFamily  = s.font;
+    if (tickerBadge) tickerBadge.style.fontFamily = s.font;
   }
 
   // ── Text alignment ────────────────────────────────────────────────────────

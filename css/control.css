@@ -117,6 +117,28 @@ h1 {
   50%       { opacity: .5; }
 }
 
+/* Session ID Badge — click to copy output URL */
+.btn-session-id {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  padding: 4px 9px;
+  background: rgba(200,169,81,.1);
+  border: 1px solid rgba(200,169,81,.25);
+  border-radius: var(--radius-sm);
+  color: var(--text-dim);
+  font-family: monospace;
+  font-size: .72rem;
+  font-weight: 600;
+  letter-spacing: .05em;
+  cursor: pointer;
+  white-space: nowrap;
+  transition: background .15s, border-color .15s, color .15s;
+}
+.btn-session-id svg { width: 11px; height: 11px; flex-shrink: 0; }
+.btn-session-id:hover { background: rgba(200,169,81,.2); border-color: var(--accent); color: var(--accent); }
+.btn-session-id.copied { color: var(--green); border-color: var(--green); background: rgba(76,175,80,.15); }
+
 /* New Session Button */
 .btn-session {
   display: inline-flex;
