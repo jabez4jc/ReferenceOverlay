@@ -15,7 +15,15 @@ const ltAccent = document.getElementById('lt-accent');
 const ltLine1 = document.getElementById('lt-line1');
 const ltLine2 = document.getElementById('lt-line2');
 
-// ── BroadcastChannel listener ─────────────────────────────────────────────────
+// ── window.postMessage listener (primary — works on file:// and http://) ───────
+window.addEventListener('message', e => {
+  // Only accept messages from our own opener or same-origin windows
+  if (e.data && typeof e.data === 'object' && e.data.action) {
+    handleMessage(e.data);
+  }
+});
+
+// ── BroadcastChannel listener (hosted / same-origin tab scenario) ─────────────
 let channel = null;
 try {
   channel = new BroadcastChannel(CHANNEL_NAME);
@@ -94,12 +102,12 @@ function applySettings(s) {
   body.classList.remove('chroma-blue', 'chroma-green', 'chroma-magenta', 'chroma-custom');
 
   const chromaMap = {
-    '#0000FF': 'chroma-blue',
-    '#00B140': 'chroma-green',
-    '#FF00FF': 'chroma-magenta',
+    '#0000ff': 'chroma-blue',
+    '#00b140': 'chroma-green',
+    '#ff00ff': 'chroma-magenta',
   };
 
-  const cls = chromaMap[s.chroma?.toUpperCase()] || chromaMap[s.chroma];
+  const cls = chromaMap[s.chroma?.toLowerCase()];
   if (cls) {
     body.classList.add(cls);
     body.style.background = '';

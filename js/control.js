@@ -158,12 +158,21 @@ function setOverlayStatus(visible) {
   pill.textContent = visible ? 'LIVE' : 'OFF AIR';
 }
 
-// ── Broadcast (BroadcastChannel + localStorage) ───────────────────────────────
+// ── Broadcast ─────────────────────────────────────────────────────────────────
+// Priority order:
+//   1. window.postMessage  — works on file:// AND http://, most reliable
+//   2. BroadcastChannel   — works on http:// between same-origin tabs
+//   3. localStorage       — fallback; storage event fires in other windows
 function broadcast(msg) {
+  // 1. Direct postMessage to output window (bypasses all origin restrictions)
+  if (outputWindow && !outputWindow.closed) {
+    try { outputWindow.postMessage(msg, '*'); } catch (_) {}
+  }
+  // 2. BroadcastChannel (for hosted scenarios where output.html is a separate tab)
   if (channel) {
     try { channel.postMessage(msg); } catch (_) {}
   }
-  // Always write to localStorage so the output window can poll/react
+  // 3. localStorage (storage event fires in other same-origin windows)
   try {
     localStorage.setItem(LS_KEY, JSON.stringify({ ...msg, _ts: Date.now() }));
   } catch (_) {}
