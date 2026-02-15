@@ -134,6 +134,7 @@
       <div class="preview-label">Preview</div>
       <div class="preview-viewport">
         <div class="preview-bg"></div>
+        <!-- Standard lower-third preview (hidden when custom template is active) -->
         <div class="lower-third-wrap" id="preview-wrap">
           <div class="lower-third" id="preview-lower-third">
             <div class="lt-accent"></div>
@@ -143,6 +144,10 @@
               <div class="lt-line2" id="preview-line2">King James Version</div>
             </div>
           </div>
+        </div>
+        <!-- Custom template preview (shown when custom template is enabled) -->
+        <div class="preview-custom-wrap" id="preview-custom-wrap" style="display:none">
+          <div id="preview-custom"></div>
         </div>
       </div>
     </section>

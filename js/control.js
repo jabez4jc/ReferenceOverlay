@@ -97,12 +97,37 @@ function populateChapters(bookName, selectedChapter) {
 
 function populateTranslations() {
   const sel = document.getElementById('translation');
+
+  // "None" — hides the translation name from output (line2 will be empty)
+  const noneOpt = document.createElement('option');
+  noneOpt.value       = 'NONE';
+  noneOpt.textContent = '— None (hide translation) —';
+  sel.appendChild(noneOpt);
+
+  // Three optgroups based on lookup availability
+  const grpFree    = document.createElement('optgroup');
+  grpFree.label    = 'Lookup Available — Free';
+  const grpPremium = document.createElement('optgroup');
+  grpPremium.label = 'Lookup Available — Premium';
+  const grpRef     = document.createElement('optgroup');
+  grpRef.label     = 'Reference Only';
+
   TRANSLATIONS.forEach(t => {
     const opt = document.createElement('option');
     opt.value       = t.abbr;
     opt.textContent = `${t.abbr} — ${t.name}`;
-    sel.appendChild(opt);
+    if (BIBLE_API_MAP[t.abbr]) {
+      grpFree.appendChild(opt);
+    } else if (APIBIBLE_IDS[t.abbr]) {
+      grpPremium.appendChild(opt);
+    } else {
+      grpRef.appendChild(opt);
+    }
   });
+
+  sel.appendChild(grpFree);
+  sel.appendChild(grpPremium);
+  sel.appendChild(grpRef);
   sel.value = 'KJV';
 }
 
@@ -161,7 +186,8 @@ function onSpeakerChange() { updatePreview(); }
 
 // ── Verse Reference Validation ────────────────────────────────────────────────
 function parseVerseRef(raw) {
-  const str = raw.trim().replace(/[–—]/g, '-');
+  // Strip trailing separator characters before parsing
+  const str = raw.trim().replace(/[–—]/g, '-').replace(/[-,.\s]+$/, '');
   if (!str) return { tokens: [], error: null };
 
   const segments = str.split(',').map(s => s.trim()).filter(Boolean);
@@ -187,6 +213,29 @@ function parseVerseRef(raw) {
   return { tokens, error: null };
 }
 
+// Walk tokens in order; stop (and clamp ranges) at the first value exceeding maxVerse.
+// Returns { valid: Token[], clipped: bool, firstExcess: number|null }
+function sanitiseTokens(tokens, maxVerse) {
+  if (!maxVerse || maxVerse >= 999) return { valid: tokens, clipped: false, firstExcess: null };
+  const valid = [];
+  let clipped = false;
+  let firstExcess = null;
+  for (const tok of tokens) {
+    if (tok.type === 'single') {
+      if (tok.v > maxVerse) { clipped = true; firstExcess = tok.v; break; }
+      valid.push(tok);
+    } else {
+      if (tok.from > maxVerse) { clipped = true; firstExcess = tok.from; break; }
+      if (tok.to > maxVerse) {
+        valid.push({ type: 'range', from: tok.from, to: maxVerse });
+        clipped = true; firstExcess = tok.to; break;
+      }
+      valid.push(tok);
+    }
+  }
+  return { valid, clipped, firstExcess };
+}
+
 function validateVerseInput() {
   const validationEl = document.getElementById('verse-validation');
   const raw          = document.getElementById('verse-ref').value.trim();
@@ -210,20 +259,26 @@ function validateVerseInput() {
     return false;
   }
 
-  for (const tok of tokens) {
-    if (tok.type === 'single') {
-      if (tok.v > maxVerse) {
-        validationEl.textContent = `✗ Verse ${tok.v} exceeds chapter max (${maxVerse})`;
-        validationEl.className   = 'verse-validation invalid';
-        return false;
-      }
-    } else {
-      if (tok.to > maxVerse) {
-        validationEl.textContent = `✗ Verse ${tok.to} exceeds chapter max (${maxVerse})`;
-        validationEl.className   = 'verse-validation invalid';
-        return false;
-      }
-    }
+  if (tokens.length === 0) {
+    validationEl.textContent = '';
+    validationEl.className   = 'verse-validation';
+    return true;
+  }
+
+  const { valid, clipped, firstExcess } = sanitiseTokens(tokens, maxVerse);
+
+  if (valid.length === 0) {
+    // Every entry is out of range — nothing can be displayed
+    validationEl.textContent = `✗ Verse ${firstExcess} exceeds chapter max (${maxVerse})`;
+    validationEl.className   = 'verse-validation invalid';
+    return false;
+  }
+
+  if (clipped) {
+    // Partial — some valid verses exist, excess is stripped from output
+    validationEl.textContent = `⚠ Verse ${firstExcess} exceeds max (${maxVerse}) — output will use valid verses only`;
+    validationEl.className   = 'verse-validation warning';
+    return true;
   }
 
   validationEl.textContent = `✓ Valid — chapter has ${maxVerse} verses`;
@@ -231,10 +286,13 @@ function validateVerseInput() {
   return true;
 }
 
-function formatVerseRef(raw) {
+// Format verse ref for display, optionally sanitising against maxVerse first.
+function formatVerseRef(raw, maxVerse) {
   const { tokens, error } = parseVerseRef(raw);
-  if (error || tokens.length === 0) return raw.trim();
-  return tokens.map(tok =>
+  if (error || tokens.length === 0) return raw.trim().replace(/[-,.\s]+$/, '');
+  const toUse = maxVerse ? sanitiseTokens(tokens, maxVerse).valid : tokens;
+  if (toUse.length === 0) return '';
+  return toUse.map(tok =>
     tok.type === 'single' ? String(tok.v) : `${tok.from}–${tok.to}`
   ).join(', ');
 }
@@ -249,10 +307,15 @@ const APIBIBLE_BASE = 'https://rest.api.bible/v1';
 const APIBIBLE_KEY  = '8LWqzQ47HMAtKGhfXVY2K';
 
 function lookupVerse() {
-  const book       = document.getElementById('book').value;
-  const chapter    = document.getElementById('chapter').value;
-  const verseRaw   = document.getElementById('verse-ref').value.trim();
-  const transAbbr  = document.getElementById('translation').value;
+  const book      = document.getElementById('book').value;
+  const chapter   = document.getElementById('chapter').value;
+  const verseRaw  = document.getElementById('verse-ref').value.trim();
+  const transAbbr = document.getElementById('translation').value;
+
+  if (transAbbr === 'NONE') {
+    setLookupStatus('Select a translation to look up verse text.', 'error');
+    return;
+  }
 
   if (!chapter || !verseRaw) {
     setLookupStatus('Enter a chapter and verse first.', 'error');
@@ -265,10 +328,22 @@ function lookupVerse() {
     return;
   }
 
-  // Use only the first token for the fetch; multi-segment refs fetch the first segment
-  const tok        = tokens[0];
-  const verseParam = tok.type === 'single' ? String(tok.v) : `${tok.from}-${tok.to}`;
-  const cacheKey   = `${book}|${chapter}|${verseParam}|${transAbbr}`;
+  // Sanitise tokens against this chapter's verse count
+  const bookObj  = BIBLE_BOOKS.find(b => b.name === book);
+  const chapIdx  = parseInt(chapter, 10) - 1;
+  const maxVerse = bookObj && bookObj.verses ? bookObj.verses[chapIdx] : 999;
+  const { valid: validTokens } = sanitiseTokens(tokens, maxVerse);
+
+  if (validTokens.length === 0) {
+    setLookupStatus('No valid verse numbers to look up.', 'error');
+    return;
+  }
+
+  // Canonical cache key built from sanitised tokens so partial-valid refs share the same entry
+  const verseKey = validTokens.map(t =>
+    t.type === 'single' ? String(t.v) : `${t.from}-${t.to}`
+  ).join(',');
+  const cacheKey = `${book}|${chapter}|${verseKey}|${transAbbr}`;
 
   if (verseTextCache[cacheKey]) {
     displayVerseText(verseTextCache[cacheKey]);
@@ -278,8 +353,12 @@ function lookupVerse() {
   setLookupStatus('Looking up…', 'loading');
 
   // ── Tier 1: bible-api.com (free, public-domain) ───────────────────────────
+  // Pass the full comma/range verse string — bible-api.com natively handles it.
   const freeApiTrans = BIBLE_API_MAP[transAbbr];
   if (freeApiTrans) {
+    const verseParam = validTokens.map(t =>
+      t.type === 'single' ? String(t.v) : `${t.from}-${t.to}`
+    ).join(',');
     const ref = `${book} ${chapter}:${verseParam}`;
     const url = `https://bible-api.com/${encodeURIComponent(ref)}?translation=${freeApiTrans}`;
     fetch(url)
@@ -295,6 +374,8 @@ function lookupVerse() {
   }
 
   // ── Tier 2: rest.api.bible (API key, premium translations) ───────────────
+  // api.bible doesn't support discontinuous verse lists, so each token is
+  // fetched as its own passage request and the results are concatenated.
   const apiBibleId = APIBIBLE_IDS[transAbbr];
   if (apiBibleId) {
     const usfmBook = USFM_CODES[book];
@@ -303,25 +384,24 @@ function lookupVerse() {
       return;
     }
 
-    // Build USFM passage ID: e.g. JHN.3.16  or  JHN.3.16-JHN.3.17
-    let passageId;
-    if (tok.type === 'single') {
-      passageId = `${usfmBook}.${chapter}.${tok.v}`;
-    } else {
-      passageId = `${usfmBook}.${chapter}.${tok.from}-${usfmBook}.${chapter}.${tok.to}`;
-    }
+    const fetchToken = tok => {
+      const passageId = tok.type === 'single'
+        ? `${usfmBook}.${chapter}.${tok.v}`
+        : `${usfmBook}.${chapter}.${tok.from}-${usfmBook}.${chapter}.${tok.to}`;
+      const url = `${APIBIBLE_BASE}/bibles/${apiBibleId}/passages/${passageId}` +
+                  `?content-type=text&include-notes=false&include-titles=false` +
+                  `&include-chapter-numbers=false&include-verse-numbers=false`;
+      return fetch(url, { headers: { 'api-key': APIBIBLE_KEY } })
+        .then(r => { if (!r.ok) throw new Error(`HTTP ${r.status}`); return r.json(); })
+        .then(data => {
+          const text = data?.data?.content;
+          if (!text) throw new Error('No text in response');
+          return text;
+        });
+    };
 
-    const url = `${APIBIBLE_BASE}/bibles/${apiBibleId}/passages/${passageId}` +
-                `?content-type=text&include-notes=false&include-titles=false` +
-                `&include-chapter-numbers=false&include-verse-numbers=false`;
-
-    fetch(url, { headers: { 'api-key': APIBIBLE_KEY } })
-      .then(r => { if (!r.ok) throw new Error(`HTTP ${r.status}`); return r.json(); })
-      .then(data => {
-        const text = data?.data?.content;
-        if (!text) throw new Error('No text in response');
-        finaliseLookup(cacheKey, text);
-      })
+    Promise.all(validTokens.map(fetchToken))
+      .then(texts => finaliseLookup(cacheKey, texts.join(' ')))
       .catch(err => setLookupStatus(`Lookup failed: ${err.message}`, 'error'));
     return;
   }
@@ -375,18 +455,39 @@ function buildOverlayData() {
     const translAbbr = document.getElementById('translation').value;
     const translation = TRANSLATIONS.find(t => t.abbr === translAbbr);
 
+    // Compute maxVerse so the ref is sanitised before going to output
+    const bookObj  = BIBLE_BOOKS.find(b => b.name === book);
+    const chapIdx  = parseInt(chapter, 10) - 1;
+    const maxVerse = bookObj && bookObj.verses ? bookObj.verses[chapIdx] : 999;
+
     let ref = book;
     if (chapter) {
       ref += ' ' + chapter;
-      if (verseRaw) ref += ':' + formatVerseRef(verseRaw);
+      if (verseRaw) {
+        const sanitised = formatVerseRef(verseRaw, maxVerse);
+        if (sanitised) ref += ':' + sanitised;
+      }
     }
 
     const includeText = document.getElementById('include-verse-text')?.checked;
-    const line2 = (includeText && verseTextCurrent)
-      ? verseTextCurrent
-      : (translation ? translation.name : translAbbr);
+    const showingText = !!(includeText && verseTextCurrent);
 
-    return { type: 'bible', line1: ref, line2 };
+    // Append (ABBR) to the reference line when verse text is shown as line 2
+    const line1 = (showingText && translAbbr !== 'NONE')
+      ? `${ref} (${translAbbr})`
+      : ref;
+
+    // line2: verse text → translation full name → empty (when NONE selected)
+    let line2;
+    if (showingText) {
+      line2 = verseTextCurrent;
+    } else if (translAbbr === 'NONE') {
+      line2 = '';
+    } else {
+      line2 = translation ? translation.name : translAbbr;
+    }
+
+    return { type: 'bible', line1, line2 };
   } else {
     const name  = document.getElementById('speaker-name').value.trim();
     const title = document.getElementById('speaker-title').value.trim();
@@ -394,13 +495,58 @@ function buildOverlayData() {
   }
 }
 
+// ── Preview helpers ───────────────────────────────────────────────────────────
+function escapeHtml(str) {
+  return String(str)
+    .replace(/&/g, '&amp;').replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;').replace(/"/g, '&quot;');
+}
+
+function substitutePreviewVars(str, s, data) {
+  return str
+    .replace(/\{\{line1\}\}/g,       data?.line1 ? escapeHtml(data.line1) : '')
+    .replace(/\{\{line2\}\}/g,       data?.line2 ? escapeHtml(data.line2) : '')
+    .replace(/\{\{accentColor\}\}/g, s.accentColor || '#C8A951')
+    .replace(/\{\{font\}\}/g,        s.font        || 'system-ui');
+}
+
 // ── Preview ───────────────────────────────────────────────────────────────────
 function updatePreview() {
   const data     = buildOverlayData();
   const settings = getSettings();
+  const useCustom = !!(settings.customTemplate?.enabled && settings.customTemplate?.html);
 
-  document.getElementById('preview-line1').textContent = data.line1;
-  document.getElementById('preview-line2').textContent = data.line2;
+  const previewWrap = document.getElementById('preview-wrap');
+  const customWrap  = document.getElementById('preview-custom-wrap');
+  const customEl    = document.getElementById('preview-custom');
+
+  if (useCustom) {
+    // ── Custom template preview ───────────────────────────────────────────
+    if (previewWrap) previewWrap.style.display = 'none';
+    if (customWrap)  customWrap.style.display  = '';
+    if (customEl) {
+      customEl.innerHTML = substitutePreviewVars(settings.customTemplate.html, settings, data);
+    }
+    // Inject scoped CSS (risk of collisions is low; custom class names differ from ours)
+    let styleEl = document.getElementById('preview-custom-style');
+    if (!styleEl) {
+      styleEl    = document.createElement('style');
+      styleEl.id = 'preview-custom-style';
+      document.head.appendChild(styleEl);
+    }
+    styleEl.textContent = substitutePreviewVars(settings.customTemplate.css || '', settings, data);
+    return;
+  }
+
+  // ── Standard lower-third preview ─────────────────────────────────────────
+  if (previewWrap) previewWrap.style.display = '';
+  if (customWrap)  customWrap.style.display  = 'none';
+  // Clear injected custom CSS when template is disabled
+  const staleStyle = document.getElementById('preview-custom-style');
+  if (staleStyle) staleStyle.textContent = '';
+
+  document.getElementById('preview-line1').textContent   = data.line1;
+  document.getElementById('preview-line2').textContent   = data.line2;
   document.getElementById('preview-line2').style.display = data.line2 ? '' : 'none';
 
   const lt = document.getElementById('preview-lower-third');

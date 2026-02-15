@@ -277,6 +277,7 @@ input::placeholder { color: var(--text-dim); }
 }
 .verse-validation.valid   { color: #4caf50; }
 .verse-validation.invalid { color: #f44336; }
+.verse-validation.warning { color: #ff9800; }
 
 /* ── Preview Section ──────────────────────────────────────────────────────── */
 .preview-section {
@@ -311,6 +312,14 @@ input::placeholder { color: var(--text-dim); }
       #1a1d27 0, #1a1d27 10px,
       #1e2130 10px, #1e2130 20px
     );
+}
+
+/* Custom template preview occupies the full viewport so the template can
+   position itself freely (it uses the same coordinate space as the output). */
+.preview-custom-wrap {
+  position: absolute;
+  inset: 0;
+  overflow: hidden;
 }
 
 .lower-third-wrap {
