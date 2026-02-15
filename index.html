@@ -26,6 +26,10 @@
     <div class="header-right">
       <span id="status-pill" class="status-pill status-off">OFF AIR</span>
       <span id="ws-indicator" class="ws-indicator" data-state="offline" title="WebSocket server not running"></span>
+      <button class="btn-session-id" id="btn-session-id" onclick="copyOutputLink()" title="Click to copy output window URL to clipboard">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="9" y="9" width="13" height="13" rx="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></svg>
+        <span id="session-id-text">#…</span>
+      </button>
       <button class="btn-session" id="btn-new-session" onclick="openNewSession()" title="Open a fresh independent session in a new tab">
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
         New Session
@@ -232,14 +236,19 @@
     <!-- ── Presets ────────────────────────────────────────────────────────── -->
     <section class="presets-section">
       <div class="presets-header">
-        <span class="presets-label">Presets</span>
+        <span class="presets-label" id="presets-label">Reference &amp; Speaker Presets</span>
         <button class="btn-save-preset" onclick="saveCurrentPreset()">
           <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M19 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11l5 5v11a2 2 0 0 1-2 2z"/><polyline points="17 21 17 13 7 13 7 21"/><polyline points="7 3 7 8 15 8"/></svg>
           Save Current
         </button>
       </div>
-      <div class="presets-list" id="presets-list">
-        <span class="presets-empty" id="presets-empty">No presets saved — click Save Current to add one</span>
+      <!-- Overlay presets (Bible + Speaker) -->
+      <div class="presets-list" id="presets-list-overlay">
+        <span class="presets-empty" id="presets-empty-overlay">No presets saved — click Save Current to add one</span>
+      </div>
+      <!-- Ticker presets (hidden when not in ticker mode) -->
+      <div class="presets-list" id="presets-list-ticker" style="display:none">
+        <span class="presets-empty" id="presets-empty-ticker">No ticker presets saved — click Save Current to add one</span>
       </div>
     </section>
 

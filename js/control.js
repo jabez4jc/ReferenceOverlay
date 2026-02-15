@@ -35,8 +35,9 @@ let verseTextCurrent = null;    // last successfully fetched verse text
 let verseTextCache   = {};      // { "Book Ch:V|trans": "verse text..." }
 let lookupTimer      = null;    // debounce handle
 
-// Presets
-let presets = [];
+// Presets — separate stores for overlay (bible/speaker) vs ticker
+let overlayPresets = [];
+let tickerPresets  = [];
 
 // Communication channels (BroadcastChannel primary; localStorage fallback)
 // All keys are namespaced with SESSION_ID so multiple users don't collide.
@@ -62,6 +63,10 @@ document.addEventListener('DOMContentLoaded', () => {
   updatePreview();
   bindKeyboard();
   initWebSocket();
+
+  // Display short session ID in the header badge
+  const sessionBadge = document.getElementById('session-id-text');
+  if (sessionBadge) sessionBadge.textContent = '#' + SESSION_ID;
 });
 
 // ── Populate Dropdowns ────────────────────────────────────────────────────────
@@ -166,6 +171,7 @@ function setMode(mode) {
     document.getElementById('speaker-title').value = '';
   }
 
+  renderPresets();
   updatePreview();
 }
 
@@ -664,13 +670,15 @@ function updatePreview() {
 // ── Presets ───────────────────────────────────────────────────────────────────
 function loadPresets() {
   try {
-    presets = JSON.parse(localStorage.getItem('overlayPresets-' + SESSION_ID) || '[]');
-  } catch (_) { presets = []; }
+    overlayPresets = JSON.parse(localStorage.getItem('overlayPresets-' + SESSION_ID) || '[]');
+  } catch (_) { overlayPresets = []; }
+  try {
+    tickerPresets  = JSON.parse(localStorage.getItem('tickerPresets-'  + SESSION_ID) || '[]');
+  } catch (_) { tickerPresets  = []; }
   renderPresets();
 }
 
 function saveCurrentPreset() {
-  // Generate a default label from current fields
   let defaultLabel = '';
   if (currentMode === 'bible') {
     const book  = document.getElementById('book').value;
@@ -678,83 +686,126 @@ function saveCurrentPreset() {
     const verse = document.getElementById('verse-ref').value.trim();
     const trans = document.getElementById('translation').value;
     defaultLabel = verse ? `${book} ${ch}:${verse} (${trans})` : `${book} ${ch}`;
-  } else {
+  } else if (currentMode === 'speaker') {
     const name  = document.getElementById('speaker-name').value.trim();
     const title = document.getElementById('speaker-title').value.trim();
     defaultLabel = title ? `${name} — ${title}` : name;
+  } else {
+    // ticker
+    const msg = document.getElementById('ticker-message')?.value.trim() || '';
+    defaultLabel = msg.slice(0, 40) + (msg.length > 40 ? '…' : '');
   }
 
   const label = prompt('Preset name:', defaultLabel);
-  if (label === null) return;             // cancelled
-  if (!label.trim()) return;             // empty
+  if (label === null || !label.trim()) return;
 
   const preset = {
     id:    Date.now().toString(36) + Math.random().toString(36).slice(2, 5),
     label: label.trim(),
     mode:  currentMode,
-    data:  currentMode === 'bible' ? {
-      book:        document.getElementById('book').value,
-      chapter:     document.getElementById('chapter').value,
-      verse:       document.getElementById('verse-ref').value,
-      translation: document.getElementById('translation').value,
-    } : {
-      name:  document.getElementById('speaker-name').value,
-      title: document.getElementById('speaker-title').value,
-    },
+    data:  currentMode === 'bible'
+      ? { book:        document.getElementById('book').value,
+          chapter:     document.getElementById('chapter').value,
+          verse:       document.getElementById('verse-ref').value,
+          translation: document.getElementById('translation').value }
+      : currentMode === 'speaker'
+      ? { name:  document.getElementById('speaker-name').value,
+          title: document.getElementById('speaker-title').value }
+      : { message:  document.getElementById('ticker-message')?.value || '',
+          label:    document.getElementById('ticker-label')?.value   || '⚠ ALERT',
+          speed:    document.getElementById('ticker-speed')?.value   || '140',
+          style:    document.getElementById('ticker-style')?.value   || 'alert',
+          position: document.getElementById('ticker-position')?.value || 'bottom' },
   };
 
-  presets.push(preset);
+  if (currentMode === 'ticker') {
+    tickerPresets.push(preset);
+  } else {
+    overlayPresets.push(preset);
+  }
   savePresetsToStorage();
   renderPresets();
 }
 
 function loadPreset(id) {
-  const p = presets.find(x => x.id === id);
+  // Search in the active preset store
+  const store = currentMode === 'ticker' ? tickerPresets : overlayPresets;
+  const p = store.find(x => x.id === id);
   if (!p) return;
 
-  setMode(p.mode);
-  clearVerseText();
-
-  if (p.mode === 'bible') {
-    document.getElementById('book').value = p.data.book;
-    populateChapters(p.data.book, parseInt(p.data.chapter));
-    document.getElementById('chapter').value     = p.data.chapter;
-    document.getElementById('verse-ref').value   = p.data.verse;
-    document.getElementById('translation').value = p.data.translation;
-    validateVerseInput();
+  if (p.mode !== 'ticker') {
+    setMode(p.mode);
+    clearVerseText();
+    if (p.mode === 'bible') {
+      document.getElementById('book').value = p.data.book;
+      populateChapters(p.data.book, parseInt(p.data.chapter));
+      document.getElementById('chapter').value     = p.data.chapter;
+      document.getElementById('verse-ref').value   = p.data.verse;
+      document.getElementById('translation').value = p.data.translation;
+      validateVerseInput();
+    } else {
+      document.getElementById('speaker-name').value  = p.data.name;
+      document.getElementById('speaker-title').value = p.data.title;
+    }
   } else {
-    document.getElementById('speaker-name').value  = p.data.name;
-    document.getElementById('speaker-title').value = p.data.title;
+    if (document.getElementById('ticker-message'))
+      document.getElementById('ticker-message').value  = p.data.message  || '';
+    if (document.getElementById('ticker-label'))
+      document.getElementById('ticker-label').value    = p.data.label    || '⚠ ALERT';
+    if (document.getElementById('ticker-speed'))
+      document.getElementById('ticker-speed').value    = p.data.speed    || '140';
+    if (document.getElementById('ticker-style')) {
+      document.getElementById('ticker-style').value    = p.data.style    || 'alert';
+      onTickerStyleChange();
+    }
+    if (document.getElementById('ticker-position'))
+      document.getElementById('ticker-position').value = p.data.position || 'bottom';
   }
   updatePreview();
 }
 
 function deletePreset(id) {
-  presets = presets.filter(p => p.id !== id);
+  if (currentMode === 'ticker') {
+    tickerPresets  = tickerPresets.filter(p => p.id !== id);
+  } else {
+    overlayPresets = overlayPresets.filter(p => p.id !== id);
+  }
   savePresetsToStorage();
   renderPresets();
 }
 
 function savePresetsToStorage() {
-  try {
-    localStorage.setItem('overlayPresets-' + SESSION_ID, JSON.stringify(presets));
-  } catch (_) {}
+  try { localStorage.setItem('overlayPresets-' + SESSION_ID, JSON.stringify(overlayPresets)); } catch (_) {}
+  try { localStorage.setItem('tickerPresets-'  + SESSION_ID, JSON.stringify(tickerPresets));  } catch (_) {}
 }
 
 function renderPresets() {
-  const list  = document.getElementById('presets-list');
-  const empty = document.getElementById('presets-empty');
+  const isTicker = currentMode === 'ticker';
+
+  // Update section label
+  const labelEl = document.getElementById('presets-label');
+  if (labelEl) labelEl.textContent = isTicker ? 'Ticker Presets' : 'Reference & Speaker Presets';
+
+  // Show / hide the correct list
+  const overlayList = document.getElementById('presets-list-overlay');
+  const tickerList  = document.getElementById('presets-list-ticker');
+  if (overlayList) overlayList.style.display = isTicker ? 'none' : '';
+  if (tickerList)  tickerList.style.display  = isTicker ? ''     : 'none';
+
+  const list  = isTicker ? tickerList  : overlayList;
+  const empty = document.getElementById(isTicker ? 'presets-empty-ticker' : 'presets-empty-overlay');
+  const store = isTicker ? tickerPresets : overlayPresets;
   if (!list) return;
 
   list.querySelectorAll('.preset-chip').forEach(el => el.remove());
 
-  if (presets.length === 0) {
+  if (store.length === 0) {
     if (empty) empty.style.display = '';
     return;
   }
   if (empty) empty.style.display = 'none';
 
-  presets.forEach(p => {
+  store.forEach(p => {
     const chip = document.createElement('div');
     chip.className  = 'preset-chip';
     chip.dataset.id = p.id;
@@ -764,8 +815,10 @@ function renderPresets() {
     loadBtn.textContent = p.label;
     if (p.mode === 'bible') {
       loadBtn.title = `${p.data.book} ${p.data.chapter}:${p.data.verse} (${p.data.translation})`;
-    } else {
+    } else if (p.mode === 'speaker') {
       loadBtn.title = `${p.data.name}${p.data.title ? ' — ' + p.data.title : ''}`;
+    } else {
+      loadBtn.title = p.data.message?.slice(0, 60) || '';
     }
     loadBtn.addEventListener('click', () => loadPreset(p.id));
 
@@ -853,6 +906,29 @@ function broadcast(msg) {
 // ── New Session ───────────────────────────────────────────────────────────────
 function openNewSession() {
   window.open(location.pathname, '_blank');
+}
+
+// ── Copy Output Link ──────────────────────────────────────────────────────────
+// Copies the output.html URL (with session ID and current origin/path) so the
+// operator can paste it into a TV browser or another device on the same network.
+function copyOutputLink() {
+  const outputUrl = location.origin + location.pathname.replace(/index\.html$/, '').replace(/[^/]*$/, '')
+    + 'output.html?session=' + SESSION_ID;
+  navigator.clipboard.writeText(outputUrl).then(() => {
+    const btn = document.getElementById('btn-session-id');
+    if (!btn) return;
+    btn.classList.add('copied');
+    const span = document.getElementById('session-id-text');
+    const prev = span ? span.textContent : '';
+    if (span) span.textContent = 'Copied!';
+    setTimeout(() => {
+      btn.classList.remove('copied');
+      if (span) span.textContent = prev;
+    }, 1800);
+  }).catch(() => {
+    // Fallback for browsers that deny clipboard without HTTPS
+    prompt('Copy this output URL:', location.origin + location.pathname.replace(/index\.html$/, '').replace(/[^/]*$/, '') + 'output.html?session=' + SESSION_ID);
+  });
 }
 
 // ── Multiple Output Targets ───────────────────────────────────────────────────
