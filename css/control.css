@@ -117,6 +117,25 @@ h1 {
   50%       { opacity: .5; }
 }
 
+/* New Session Button */
+.btn-session {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 6px 12px;
+  background: transparent;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  color: var(--text-dim);
+  font-size: .75rem;
+  font-weight: 500;
+  cursor: pointer;
+  transition: background .15s, border-color .15s, color .15s;
+  white-space: nowrap;
+}
+.btn-session svg { width: 13px; height: 13px; }
+.btn-session:hover { background: var(--surface-2); border-color: var(--border-light); color: var(--text-muted); }
+
 /* Output Window Button */
 .btn-output-link {
   display: inline-flex;
@@ -644,6 +663,58 @@ input[type="color"] {
   max-width: 116px;
   object-fit: contain;
 }
+
+/* ── Lower Third Style Variants (preview) ─────────────────────────────────── */
+
+/* accent-only */
+.style-accent .lt-text {
+  background: transparent;
+  border-top: 3px solid var(--accent, #C8A951);
+  padding-left: 0;
+  padding-bottom: 0;
+}
+.style-accent .lt-accent    { display: none; }
+.style-accent .lt-line1     { color: #fff; text-shadow: 0 1px 6px rgba(0,0,0,.9); }
+.style-accent .lt-line2     { color: rgba(255,255,255,.85); }
+
+/* minimal */
+.style-minimal .lt-text     { background: transparent; }
+.style-minimal .lt-accent   { display: none; }
+.style-minimal .lt-line1    { color: #fff; text-shadow: 0 0 16px rgba(0,0,0,1), 0 2px 4px rgba(0,0,0,.9); }
+.style-minimal .lt-line2    { color: rgba(255,255,255,.85); text-shadow: 0 0 12px rgba(0,0,0,1); }
+.style-minimal .lower-third { box-shadow: none; }
+
+/* outline */
+.style-outline .lt-text     { background: transparent; }
+.style-outline .lt-accent   { display: none; }
+.style-outline .lt-line1    { color: #fff; -webkit-text-stroke: 1.5px rgba(0,0,0,.9); text-shadow: 0 0 14px rgba(0,0,0,.7); }
+.style-outline .lt-line2    { color: rgba(255,255,255,.85); -webkit-text-stroke: 1px rgba(0,0,0,.8); }
+.style-outline .lower-third { box-shadow: none; }
+
+/* gradient fade */
+.style-gradient .lt-text    { background: linear-gradient(to right, rgba(0,0,0,.88) 0%, rgba(0,0,0,.60) 60%, rgba(0,0,0,0) 100%); padding-right: 24px; }
+.style-gradient .lt-line1   { color: #fff; text-shadow: 0 1px 6px rgba(0,0,0,.8); }
+.style-gradient .lt-line2   { color: rgba(255,255,255,.85); }
+.style-gradient .lower-third { box-shadow: none; overflow: visible; }
+
+/* solid accent fill */
+.style-solid .lt-text       { background: var(--accent, #C8A951); }
+.style-solid .lt-accent     { background: rgba(0,0,0,.25); width: 4px; }
+.style-solid .lt-line1      { color: #fff; text-shadow: 0 1px 3px rgba(0,0,0,.4); }
+.style-solid .lt-line2      { color: rgba(255,255,255,.88); }
+
+/* split lines */
+.style-split .lt-text       { background: rgba(0,0,0,.65); border-top: 2px solid var(--accent, #C8A951); border-bottom: 2px solid var(--accent, #C8A951); padding-left: 0; }
+.style-split .lt-accent     { display: none; }
+.style-split .lt-line1      { color: #fff; text-shadow: 0 1px 6px rgba(0,0,0,.9); }
+.style-split .lt-line2      { color: rgba(255,255,255,.85); }
+.style-split .lower-third   { box-shadow: none; }
+
+/* frosted glass */
+.style-frosted .lt-text     { background: rgba(255,255,255,.75); }
+.style-frosted .lt-accent   { width: 4px; }
+.style-frosted .lt-line1    { color: #111; text-shadow: none; }
+.style-frosted .lt-line2    { color: rgba(0,0,0,.60); text-shadow: none; }
 
 /* ── Keyboard Hint ────────────────────────────────────────────────────────── */
 .kbd-hint {

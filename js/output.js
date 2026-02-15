@@ -4,8 +4,11 @@
 
 'use strict';
 
-const CHANNEL_NAME = 'reference-overlay';
-const LS_KEY       = 'referenceOverlayState';
+// Read the session ID from the URL (?session=...) so this output window
+// only communicates with its paired control panel, not with other sessions.
+const SESSION_ID   = new URLSearchParams(location.search).get('session') || 'default';
+const CHANNEL_NAME = 'reference-overlay-' + SESSION_ID;
+const LS_KEY       = 'referenceOverlayState-' + SESSION_ID;
 
 // DOM refs
 const body    = document.getElementById('output-body');
@@ -122,7 +125,8 @@ function applySettings(s) {
   ltWrap.classList.add('anim-' + (s.animation || 'fade'));
 
   // ── Lower third style ──────────────────────────────────────────────────────
-  ltRoot.classList.remove('style-classic', 'style-accent', 'style-minimal', 'style-outline');
+  ltRoot.classList.remove('style-classic', 'style-accent', 'style-minimal', 'style-outline',
+                          'style-gradient', 'style-solid', 'style-split', 'style-frosted');
   ltRoot.classList.add('style-' + (s.style || 'classic'));
 
   // ── Accent colour ──────────────────────────────────────────────────────────
@@ -185,13 +189,13 @@ function applySettings(s) {
 // ── Apply settings from localStorage on load ──────────────────────────────────
 function applyInitialSettings() {
   try {
-    const saved = JSON.parse(localStorage.getItem('overlaySettings') || '{}');
+    const saved = JSON.parse(localStorage.getItem('overlaySettings-' + SESSION_ID) || '{}');
 
     // Restore images from their own localStorage keys
-    const ltBg = localStorage.getItem('overlayLtBg');
+    const ltBg = localStorage.getItem('overlayLtBg-' + SESSION_ID);
     if (ltBg) saved.ltBgImage = ltBg;
 
-    const logo = localStorage.getItem('overlayLogo');
+    const logo = localStorage.getItem('overlayLogo-' + SESSION_ID);
     if (logo) saved.logoDataUrl = logo;
 
     if (Object.keys(saved).length) applySettings(saved);

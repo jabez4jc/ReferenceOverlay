@@ -4,6 +4,23 @@
 
 'use strict';
 
+// ── Session ID ────────────────────────────────────────────────────────────────
+// Each browser tab gets its own session ID so multiple operators can run
+// independent control panels with isolated output windows simultaneously.
+// The ID is stored in the URL (?session=...) so it survives page reloads.
+function getOrCreateSessionId() {
+  const params = new URLSearchParams(location.search);
+  let id = params.get('session');
+  if (!id) {
+    // Generate a short random ID and write it into the URL (no page reload)
+    id = Math.random().toString(36).slice(2, 9);
+    params.set('session', id);
+    history.replaceState({}, '', '?' + params.toString());
+  }
+  return id;
+}
+const SESSION_ID = getOrCreateSessionId();
+
 // ── State ─────────────────────────────────────────────────────────────────────
 let currentMode    = 'bible';  // 'bible' | 'speaker'
 let overlayVisible = false;
@@ -14,8 +31,9 @@ let ltBgDataUrl   = null;   // lower-third background image
 let logoDataUrl   = null;   // logo PNG
 
 // Communication channel (BroadcastChannel primary; localStorage fallback)
-const CHANNEL_NAME = 'reference-overlay';
-const LS_KEY       = 'referenceOverlayState';
+// All keys are namespaced with SESSION_ID so multiple users don't collide.
+const CHANNEL_NAME = 'reference-overlay-' + SESSION_ID;
+const LS_KEY       = 'referenceOverlayState-' + SESSION_ID;
 let channel        = null;
 
 try {
@@ -351,6 +369,13 @@ function broadcast(msg) {
   } catch (_) {}
 }
 
+// ── New Session ────────────────────────────────────────────────────────────────
+// Opens a fresh control panel in a new tab with a brand-new session ID.
+// Multiple operators can each open their own session and get independent outputs.
+function openNewSession() {
+  window.open(location.pathname, '_blank');
+}
+
 // ── Output Window ──────────────────────────────────────────────────────────────
 function openOutputWindow() {
   const settings = getSettings();
@@ -367,8 +392,8 @@ function openOutputWindow() {
   const top  = Math.max(0, (screen.height - h) / 2);
 
   outputWindow = window.open(
-    'output.html',
-    'ReferenceOverlayOutput',
+    'output.html?session=' + SESSION_ID,
+    'ReferenceOverlayOutput-' + SESSION_ID,
     `width=${w},height=${h},left=${left},top=${top},` +
     `resizable=yes,scrollbars=no,toolbar=no,menubar=no,location=no,status=no`
   );
@@ -426,16 +451,16 @@ function persistSettings(settings) {
   try {
     // Don't store large data URLs in localStorage main settings — use separate keys
     const small = { ...settings, ltBgImage: null, logoDataUrl: null };
-    localStorage.setItem('overlaySettings', JSON.stringify(small));
+    localStorage.setItem('overlaySettings-' + SESSION_ID, JSON.stringify(small));
     // Store images separately (may throw if too large — handled gracefully)
-    if (settings.ltBgImage)   localStorage.setItem('overlayLtBg',   settings.ltBgImage);
-    if (settings.logoDataUrl) localStorage.setItem('overlayLogo',    settings.logoDataUrl);
+    if (settings.ltBgImage)   localStorage.setItem('overlayLtBg-' + SESSION_ID,  settings.ltBgImage);
+    if (settings.logoDataUrl) localStorage.setItem('overlayLogo-' + SESSION_ID,  settings.logoDataUrl);
   } catch (_) {}
 }
 
 function loadSettings() {
   try {
-    const saved = JSON.parse(localStorage.getItem('overlaySettings') || '{}');
+    const saved = JSON.parse(localStorage.getItem('overlaySettings-' + SESSION_ID) || '{}');
 
     if (saved.chroma) {
       const standardRadio = document.querySelector(`input[name="chroma"][value="${saved.chroma}"]`);
@@ -461,10 +486,10 @@ function loadSettings() {
     }
 
     // Restore images
-    const savedLtBg = localStorage.getItem('overlayLtBg');
+    const savedLtBg = localStorage.getItem('overlayLtBg-' + SESSION_ID);
     if (savedLtBg) { ltBgDataUrl = savedLtBg; restoreLtBgUI(savedLtBg); }
 
-    const savedLogo = localStorage.getItem('overlayLogo');
+    const savedLogo = localStorage.getItem('overlayLogo-' + SESSION_ID);
     if (savedLogo) { logoDataUrl = savedLogo; restoreLogoUI(savedLogo); }
   } catch (_) {}
 }
@@ -502,7 +527,7 @@ function clearLtBg() {
   document.getElementById('lt-bg-clear').style.display = 'none';
   document.getElementById('lt-bg-preview-wrap').style.display = 'none';
   document.getElementById('lt-bg-preview').src = '';
-  try { localStorage.removeItem('overlayLtBg'); } catch (_) {}
+  try { localStorage.removeItem('overlayLtBg-' + SESSION_ID); } catch (_) {}
   onSettingsChange();
 }
 
@@ -539,7 +564,7 @@ function clearLogo() {
   document.getElementById('logo-clear').style.display = 'none';
   document.getElementById('logo-controls').style.display = 'none';
   document.getElementById('logo-preview').src = '';
-  try { localStorage.removeItem('overlayLogo'); } catch (_) {}
+  try { localStorage.removeItem('overlayLogo-' + SESSION_ID); } catch (_) {}
   onSettingsChange();
 }
 
