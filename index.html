@@ -47,6 +47,10 @@
       <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg>
       Speaker
     </button>
+    <button id="tab-ticker" class="mode-tab" onclick="setMode('ticker')">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="3" y1="12" x2="21" y2="12"/><polyline points="15 6 21 12 15 18"/></svg>
+      Ticker
+    </button>
   </div>
 
   <!-- ── Main Content ─────────────────────────────────────────────────────── -->
@@ -129,6 +133,72 @@
       </div>
     </section>
 
+    <!-- ── Ticker Panel ───────────────────────────────────────────────────── -->
+    <section id="panel-ticker" class="panel hidden">
+      <div class="ticker-panel-grid">
+
+        <div class="field-group span-full">
+          <label for="ticker-message">
+            Ticker Message
+            <span class="label-hint">scrolls right → left on the output</span>
+          </label>
+          <textarea id="ticker-message" rows="3"
+            style="width:100%;padding:9px 12px;background:var(--surface-2);border:1px solid var(--border);border-radius:4px;color:var(--text);font-family:var(--font);font-size:.95rem;resize:vertical;"
+            placeholder="e.g. ⚠ Emergency service cancelled — please check the foyer for updates"
+            oninput="onTickerChange()"></textarea>
+        </div>
+
+        <div class="field-group">
+          <label for="ticker-label">Badge Label</label>
+          <input type="text" id="ticker-label" value="⚠ ALERT"
+                 placeholder="⚠ ALERT"
+                 oninput="onTickerChange()" onchange="onTickerChange()" />
+        </div>
+
+        <div class="field-group">
+          <label for="ticker-speed">Scroll Speed</label>
+          <select id="ticker-speed" onchange="onTickerChange()">
+            <option value="80">Slow</option>
+            <option value="140" selected>Normal</option>
+            <option value="220">Fast</option>
+            <option value="320">Very Fast</option>
+          </select>
+        </div>
+
+        <div class="field-group">
+          <label for="ticker-style">Style</label>
+          <select id="ticker-style" onchange="onTickerStyleChange()">
+            <option value="alert">Alert (red)</option>
+            <option value="info">Info (blue)</option>
+            <option value="warning">Warning (amber)</option>
+            <option value="dark">Dark</option>
+            <option value="custom">Custom colors…</option>
+          </select>
+        </div>
+
+        <div class="field-group">
+          <label for="ticker-position">Position</label>
+          <select id="ticker-position" onchange="onTickerChange()">
+            <option value="bottom" selected>Bottom</option>
+            <option value="top">Top</option>
+          </select>
+        </div>
+
+        <!-- Custom colors — hidden unless style=custom -->
+        <div id="ticker-custom-colors">
+          <div class="field-group">
+            <label class="setting-label" for="ticker-bg-color">Background</label>
+            <input type="color" id="ticker-bg-color" value="#cc0000" onchange="onTickerChange()" />
+          </div>
+          <div class="field-group">
+            <label class="setting-label" for="ticker-text-color">Text</label>
+            <input type="color" id="ticker-text-color" value="#ffffff" onchange="onTickerChange()" />
+          </div>
+        </div>
+
+      </div>
+    </section>
+
     <!-- ── Preview ────────────────────────────────────────────────────────── -->
     <section class="preview-section">
       <div class="preview-label">Preview</div>
@@ -148,6 +218,13 @@
         <!-- Custom template preview (shown when custom template is enabled) -->
         <div class="preview-custom-wrap" id="preview-custom-wrap" style="display:none">
           <div id="preview-custom"></div>
+        </div>
+        <!-- Ticker preview (shown when ticker mode is active) -->
+        <div class="preview-ticker-wrap" id="preview-ticker-wrap" style="display:none">
+          <div class="preview-ticker-bar" id="preview-ticker-bar">
+            <div class="preview-ticker-badge" id="preview-ticker-badge">⚠ ALERT</div>
+            <div class="preview-ticker-text" id="preview-ticker-text"></div>
+          </div>
         </div>
       </div>
     </section>
@@ -446,7 +523,7 @@
 
     <!-- ── Keyboard Shortcut Hint ─────────────────────────────────────────── -->
     <div class="kbd-hint">
-      <kbd>Enter</kbd> Show &nbsp;·&nbsp; <kbd>Esc</kbd> Clear &nbsp;·&nbsp; <kbd>B</kbd> Bible &nbsp;·&nbsp; <kbd>S</kbd> Speaker
+      <kbd>Enter</kbd> Show &nbsp;·&nbsp; <kbd>Esc</kbd> Clear &nbsp;·&nbsp; <kbd>B</kbd> Bible &nbsp;·&nbsp; <kbd>S</kbd> Speaker &nbsp;·&nbsp; <kbd>T</kbd> Ticker
     </div>
 
   </main>

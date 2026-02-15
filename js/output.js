@@ -24,6 +24,12 @@ const ltLine2  = document.getElementById('lt-line2');
 const ltCustomWrap = document.getElementById('lt-custom-wrap');
 const ltCustom     = document.getElementById('lt-custom');
 
+// DOM refs — ticker tape
+const tickerWrap  = document.getElementById('ticker-wrap');
+const tickerBar   = document.getElementById('ticker-bar');
+const tickerBadge = document.getElementById('ticker-badge');
+const tickerText  = document.getElementById('ticker-text');
+
 // Tracks whether the custom template is active, so showOverlay knows which path to use
 let usingCustomTemplate = false;
 // Tracks the most recently applied settings so showOverlay can access them
@@ -75,6 +81,12 @@ function handleMessage(msg) {
     case 'settings':
       applySettings(msg.settings);
       break;
+    case 'show-ticker':
+      showTicker(msg.data);
+      break;
+    case 'clear-ticker':
+      hideTicker();
+      break;
   }
 }
 
@@ -106,6 +118,55 @@ function hideOverlay() {
   ltRoot.classList.remove('visible');
   if (ltCustomWrap) ltCustomWrap.classList.remove('visible');
   try { sessionStorage.removeItem('overlayLive'); } catch (_) {}
+}
+
+// ── Ticker Show / Hide ────────────────────────────────────────────────────────
+function showTicker(data) {
+  if (!data || !tickerWrap) return;
+
+  // Apply colors
+  tickerBar.style.background = data.bgColor  || '#cc0000';
+  tickerBar.style.color      = data.textColor || '#ffffff';
+
+  // Badge label
+  tickerBadge.textContent = data.label || '⚠ ALERT';
+  tickerBadge.style.color = data.textColor || '#ffffff';
+
+  // Position (top / bottom)
+  tickerWrap.classList.remove('pos-top');
+  if (data.position === 'top') tickerWrap.classList.add('pos-top');
+
+  // Set text content and restart scroll animation
+  tickerText.classList.remove('running');
+  tickerText.textContent = data.message || '';
+
+  // Compute scroll duration: pixels of travel / speed (px/s)
+  // Travel = viewport width (100vw, approx 1920) + text natural width
+  void tickerText.offsetWidth; // force layout to get scrollWidth
+  const textPx   = tickerText.scrollWidth;
+  const totalPx  = window.innerWidth + textPx;
+  const speed    = data.speed || 140; // px/s
+  const duration = Math.max(4, totalPx / speed);
+  tickerText.style.animationDuration = duration + 's';
+
+  tickerText.classList.add('running');
+
+  // Show the wrap
+  tickerWrap.classList.add('visible');
+
+  try {
+    sessionStorage.setItem('tickerLive', JSON.stringify({ data, ts: Date.now() }));
+  } catch (_) {}
+}
+
+function hideTicker() {
+  if (!tickerWrap) return;
+  tickerWrap.classList.remove('visible');
+  // Stop animation after fade-out to save GPU
+  setTimeout(() => {
+    tickerText.classList.remove('running');
+  }, 400);
+  try { sessionStorage.removeItem('tickerLive'); } catch (_) {}
 }
 
 // ── Apply Settings ────────────────────────────────────────────────────────────
@@ -270,6 +331,12 @@ function restoreLastState() {
       applySettings(last.settings);
       setTimeout(() => showOverlay(last.data), 150);
     }
+  } catch (_) {}
+
+  // Restore ticker if it was live before reload
+  try {
+    const ticker = JSON.parse(sessionStorage.getItem('tickerLive') || 'null');
+    if (ticker && ticker.data) setTimeout(() => showTicker(ticker.data), 200);
   } catch (_) {}
 }
 

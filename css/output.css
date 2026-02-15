@@ -257,6 +257,74 @@ body.chroma-custom  { background: var(--chroma); }
 .anim-none  .lt-custom-wrap               { transition: none; }
 .anim-none  .lt-custom-wrap.visible       { opacity: 1; }
 
+/* ── Ticker Tape ─────────────────────────────────────────────────────────── */
+/* The ticker is independent of the lower-third and can be shown/hidden
+   separately.  It sits anchored to the bottom (or top) of the stage and
+   scrolls text right→left continuously while visible. */
+
+.ticker-wrap {
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  z-index: 50;
+  opacity: 0;
+  transition: opacity .35s ease;
+  pointer-events: none;
+}
+.ticker-wrap.pos-top { bottom: auto; top: 0; }
+.ticker-wrap.visible { opacity: 1; }
+
+.ticker-bar {
+  display: flex;
+  align-items: stretch;
+  height: 68px;
+  overflow: hidden;
+  /* Background and text color set by JS from data.bgColor / data.textColor */
+}
+
+/* Left badge ("⚠ ALERT") */
+.ticker-badge {
+  flex-shrink: 0;
+  display: flex;
+  align-items: center;
+  padding: 0 24px;
+  font-size: 22px;
+  font-weight: 900;
+  letter-spacing: .1em;
+  text-transform: uppercase;
+  white-space: nowrap;
+  background: rgba(0,0,0,.25);
+  border-right: 2px solid rgba(255,255,255,.25);
+}
+
+/* Scrolling viewport — clips the moving text */
+.ticker-viewport {
+  flex: 1;
+  overflow: hidden;
+  display: flex;
+  align-items: center;
+}
+
+/* The scrolling text element */
+.ticker-text {
+  flex-shrink: 0;
+  white-space: nowrap;
+  font-size: 28px;
+  font-weight: 600;
+  letter-spacing: .01em;
+  transform: translateX(100vw);  /* parked off-screen right until animation starts */
+}
+.ticker-text.running {
+  animation: ticker-scroll linear infinite;
+  /* duration set dynamically by output.js based on text length + speed */
+}
+
+@keyframes ticker-scroll {
+  from { transform: translateX(100vw); }   /* starts off-screen right */
+  to   { transform: translateX(-100%); }   /* ends off-screen left */
+}
+
 /* ── Style: frosted glass (light panel, dark text) ────────────────────────── */
 .style-frosted .lt-text {
   background: rgba(255,255,255,.78);

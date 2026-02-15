@@ -21,8 +21,9 @@ function getOrCreateSessionId() {
 const SESSION_ID = getOrCreateSessionId();
 
 // ── State ─────────────────────────────────────────────────────────────────────
-let currentMode    = 'bible';   // 'bible' | 'speaker'
+let currentMode    = 'bible';   // 'bible' | 'speaker' | 'ticker'
 let overlayVisible = false;
+let tickerActive   = false;
 let outputWindows  = [];        // ← array for multiple simultaneous targets
 
 // In-memory image stores (large files may not fit in localStorage)
@@ -155,8 +156,10 @@ function setMode(mode) {
 
   document.getElementById('tab-bible').classList.toggle('active', mode === 'bible');
   document.getElementById('tab-speaker').classList.toggle('active', mode === 'speaker');
+  document.getElementById('tab-ticker').classList.toggle('active', mode === 'ticker');
   document.getElementById('panel-bible').classList.toggle('hidden', mode !== 'bible');
   document.getElementById('panel-speaker').classList.toggle('hidden', mode !== 'speaker');
+  document.getElementById('panel-ticker').classList.toggle('hidden', mode !== 'ticker');
 
   if (mode === 'bible') {
     document.getElementById('speaker-name').value  = '';
@@ -183,6 +186,15 @@ function onBibleChange() {
   updatePreview();
 }
 function onSpeakerChange() { updatePreview(); }
+
+function onTickerChange() { updatePreview(); }
+
+function onTickerStyleChange() {
+  const style  = document.getElementById('ticker-style')?.value;
+  const custom = document.getElementById('ticker-custom-colors');
+  if (custom) custom.classList.toggle('visible', style === 'custom');
+  updatePreview();
+}
 
 // ── Verse Reference Validation ────────────────────────────────────────────────
 function parseVerseRef(raw) {
@@ -446,8 +458,35 @@ function clearVerseText() {
   setLookupStatus('', '');
 }
 
+// ── Build Ticker Data Object ──────────────────────────────────────────────────
+function buildTickerData() {
+  const message  = document.getElementById('ticker-message')?.value.trim() || '';
+  const label    = document.getElementById('ticker-label')?.value.trim()   || '⚠ ALERT';
+  const speed    = parseInt(document.getElementById('ticker-speed')?.value) || 140;
+  const style    = document.getElementById('ticker-style')?.value           || 'alert';
+  const position = document.getElementById('ticker-position')?.value        || 'bottom';
+
+  // Resolve colors from style preset or custom pickers
+  const styleColors = {
+    alert:   { bg: '#cc0000', text: '#ffffff' },
+    info:    { bg: '#1565c0', text: '#ffffff' },
+    warning: { bg: '#e65100', text: '#ffffff' },
+    dark:    { bg: '#111111', text: '#eeeeee' },
+  };
+  const colors = styleColors[style] || {
+    bg:   document.getElementById('ticker-bg-color')?.value   || '#cc0000',
+    text: document.getElementById('ticker-text-color')?.value || '#ffffff',
+  };
+
+  return { message, label, speed, position, bgColor: colors.bg, textColor: colors.text };
+}
+
 // ── Build Overlay Data Object ─────────────────────────────────────────────────
 function buildOverlayData() {
+  if (currentMode === 'ticker') {
+    // Ticker mode — return a placeholder for preview only
+    return { type: 'ticker', line1: 'Ticker active', line2: '' };
+  }
   if (currentMode === 'bible') {
     const book       = document.getElementById('book').value;
     const chapter    = document.getElementById('chapter').value || '';
@@ -518,9 +557,31 @@ function updatePreview() {
   const settings = getSettings();
   const useCustom = !!(settings.customTemplate?.enabled && settings.customTemplate?.html);
 
-  const previewWrap = document.getElementById('preview-wrap');
-  const customWrap  = document.getElementById('preview-custom-wrap');
-  const customEl    = document.getElementById('preview-custom');
+  const previewWrap   = document.getElementById('preview-wrap');
+  const customWrap    = document.getElementById('preview-custom-wrap');
+  const customEl      = document.getElementById('preview-custom');
+  const tickerPreview = document.getElementById('preview-ticker-wrap');
+
+  // ── Ticker mode preview ─────────────────────────────────────────────────────
+  if (currentMode === 'ticker') {
+    if (previewWrap)   previewWrap.style.display   = 'none';
+    if (customWrap)    customWrap.style.display     = 'none';
+    if (tickerPreview) tickerPreview.style.display  = '';
+    const td = buildTickerData();
+    const bar  = document.getElementById('preview-ticker-bar');
+    const badge = document.getElementById('preview-ticker-badge');
+    const text  = document.getElementById('preview-ticker-text');
+    if (bar)   { bar.style.background = td.bgColor; bar.style.color = td.textColor; }
+    if (badge) badge.textContent = td.label;
+    if (text)  text.textContent  = td.message || '(ticker message preview)';
+    if (tickerPreview) {
+      tickerPreview.classList.toggle('pos-top', td.position === 'top');
+    }
+    return;
+  }
+
+  // Hide ticker preview in non-ticker modes
+  if (tickerPreview) tickerPreview.style.display = 'none';
 
   if (useCustom) {
     // ── Custom template preview ───────────────────────────────────────────
@@ -721,6 +782,13 @@ function renderPresets() {
 
 // ── Send to Output ────────────────────────────────────────────────────────────
 function sendShow() {
+  if (currentMode === 'ticker') {
+    const td = buildTickerData();
+    if (!td.message) return;
+    broadcast({ action: 'show-ticker', data: td });
+    setTickerStatus(true);
+    return;
+  }
   const data     = buildOverlayData();
   const settings = getSettings();
   broadcast({ action: 'show', data, settings });
@@ -729,6 +797,11 @@ function sendShow() {
 }
 
 function sendClear() {
+  if (currentMode === 'ticker') {
+    broadcast({ action: 'clear-ticker' });
+    setTickerStatus(false);
+    return;
+  }
   broadcast({ action: 'clear' });
   setOverlayStatus(false);
 }
@@ -738,6 +811,13 @@ function setOverlayStatus(visible) {
   const pill = document.getElementById('status-pill');
   pill.className   = 'status-pill ' + (visible ? 'status-live' : 'status-off');
   pill.textContent = visible ? 'LIVE' : 'OFF AIR';
+}
+
+function setTickerStatus(live) {
+  tickerActive = live;
+  const pill = document.getElementById('status-pill');
+  pill.className   = 'status-pill ' + (live ? 'status-live' : 'status-off');
+  pill.textContent = live ? 'TICKER LIVE' : 'OFF AIR';
 }
 
 // ── Broadcast ─────────────────────────────────────────────────────────────────
@@ -1232,6 +1312,7 @@ function bindKeyboard() {
       case 'Escape':  e.preventDefault(); sendClear();               break;
       case 'b': case 'B': setMode('bible');                          break;
       case 's': case 'S': setMode('speaker');                        break;
+      case 't': case 'T': setMode('ticker');                         break;
       case 'o': case 'O': openOutputWindow();                        break;
     }
   });

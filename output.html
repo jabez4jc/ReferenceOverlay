@@ -51,6 +51,20 @@
       <div id="lt-custom"></div>
     </div>
 
+    <!--
+      Ticker tape — independent of the lower-third; can be shown/hidden
+      separately via show-ticker / clear-ticker broadcast actions.
+      Sits at the very bottom (or top) of the stage.
+    -->
+    <div class="ticker-wrap" id="ticker-wrap">
+      <div class="ticker-bar" id="ticker-bar">
+        <div class="ticker-badge" id="ticker-badge">⚠ ALERT</div>
+        <div class="ticker-viewport">
+          <span class="ticker-text" id="ticker-text"></span>
+        </div>
+      </div>
+    </div>
+
   </div>
 
   <script src="js/output.js"></script>

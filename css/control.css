@@ -1024,6 +1024,86 @@ input[type="color"] {
 }
 .template-textarea:focus { outline: none; border-color: var(--accent); }
 
+/* ── Ticker Tape ──────────────────────────────────────────────────────────── */
+
+/* Live indicator pill for ticker status */
+.ticker-pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  padding: 4px 10px;
+  border-radius: 999px;
+  font-size: .7rem;
+  font-weight: 700;
+  letter-spacing: .07em;
+  text-transform: uppercase;
+  background: rgba(204,0,0,.2);
+  color: #ff5252;
+}
+.ticker-pill::before {
+  content: '';
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: currentColor;
+  flex-shrink: 0;
+}
+.ticker-pill.live { animation: pulse 1.5s infinite; }
+
+/* Ticker panel field layout */
+.ticker-panel-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 12px;
+}
+.ticker-panel-grid .span-full { grid-column: 1 / -1; }
+
+/* Custom color row — hidden unless "custom" is selected */
+#ticker-custom-colors { display: none; }
+#ticker-custom-colors.visible { display: contents; }
+
+/* ── Ticker Preview (inside the preview viewport) ────────────────────────── */
+.preview-ticker-wrap {
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: 0;
+}
+.preview-ticker-wrap.pos-top { bottom: auto; top: 0; }
+
+.preview-ticker-bar {
+  display: flex;
+  align-items: stretch;
+  height: 18px;
+  overflow: hidden;
+}
+
+.preview-ticker-badge {
+  flex-shrink: 0;
+  display: flex;
+  align-items: center;
+  padding: 0 5px;
+  font-size: 5.5px;
+  font-weight: 900;
+  letter-spacing: .1em;
+  text-transform: uppercase;
+  white-space: nowrap;
+  background: rgba(0,0,0,.25);
+  border-right: 1px solid rgba(255,255,255,.25);
+}
+
+.preview-ticker-text {
+  flex: 1;
+  display: flex;
+  align-items: center;
+  padding: 0 5px;
+  font-size: 7px;
+  font-weight: 600;
+  overflow: hidden;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+}
+
 /* ── Keyboard Hint ────────────────────────────────────────────────────────── */
 .kbd-hint {
   text-align: center;
