@@ -240,8 +240,13 @@ function formatVerseRef(raw) {
 }
 
 // ── Bible API — Verse Text Lookup ─────────────────────────────────────────────
-// Uses the free bible-api.com API (no key required).
-// Supported translations: KJV, ASV, WEB, YLT, DARBY, BBE (see data.js).
+// Two-tier lookup:
+//   Tier 1: bible-api.com (free, no key) — KJV, ASV, WEB, YLT, DARBY, BBE
+//   Tier 2: rest.api.bible (API key)     — AMP, MSG, NASB, NASB95, LSV + more
+// See data.js for BIBLE_API_MAP, APIBIBLE_IDS, and USFM_CODES.
+
+const APIBIBLE_BASE = 'https://rest.api.bible/v1';
+const APIBIBLE_KEY  = '8LWqzQ47HMAtKGhfXVY2K';
 
 function lookupVerse() {
   const book       = document.getElementById('book').value;
@@ -260,50 +265,79 @@ function lookupVerse() {
     return;
   }
 
-  // Build the API verse string from the first token only (ranges supported)
-  const tok = tokens[0];
-  const verseParam = tok.type === 'single' ? tok.v : `${tok.from}-${tok.to}`;
-  const ref        = `${book} ${chapter}:${verseParam}`;
-  const apiTrans   = BIBLE_API_MAP[transAbbr];
-  const cacheKey   = ref + '|' + (apiTrans || '');
+  // Use only the first token for the fetch; multi-segment refs fetch the first segment
+  const tok        = tokens[0];
+  const verseParam = tok.type === 'single' ? String(tok.v) : `${tok.from}-${tok.to}`;
+  const cacheKey   = `${book}|${chapter}|${verseParam}|${transAbbr}`;
 
   if (verseTextCache[cacheKey]) {
     displayVerseText(verseTextCache[cacheKey]);
     return;
   }
 
-  if (!apiTrans) {
-    setLookupStatus(
-      `${transAbbr} is not available via the free API. Try KJV, ASV, or WEB.`,
-      'error'
-    );
+  setLookupStatus('Looking up…', 'loading');
+
+  // ── Tier 1: bible-api.com (free, public-domain) ───────────────────────────
+  const freeApiTrans = BIBLE_API_MAP[transAbbr];
+  if (freeApiTrans) {
+    const ref = `${book} ${chapter}:${verseParam}`;
+    const url = `https://bible-api.com/${encodeURIComponent(ref)}?translation=${freeApiTrans}`;
+    fetch(url)
+      .then(r => { if (!r.ok) throw new Error(`HTTP ${r.status}`); return r.json(); })
+      .then(data => {
+        let text = data.text;
+        if (!text && Array.isArray(data.verses)) text = data.verses.map(v => v.text.trim()).join(' ');
+        if (!text) throw new Error('No text in response');
+        finaliseLookup(cacheKey, text);
+      })
+      .catch(err => setLookupStatus(`Lookup failed: ${err.message}`, 'error'));
     return;
   }
 
-  setLookupStatus('Looking up…', 'loading');
+  // ── Tier 2: rest.api.bible (API key, premium translations) ───────────────
+  const apiBibleId = APIBIBLE_IDS[transAbbr];
+  if (apiBibleId) {
+    const usfmBook = USFM_CODES[book];
+    if (!usfmBook) {
+      setLookupStatus('Book not recognised for API lookup.', 'error');
+      return;
+    }
 
-  const url = `https://bible-api.com/${encodeURIComponent(ref)}?translation=${apiTrans}`;
+    // Build USFM passage ID: e.g. JHN.3.16  or  JHN.3.16-JHN.3.17
+    let passageId;
+    if (tok.type === 'single') {
+      passageId = `${usfmBook}.${chapter}.${tok.v}`;
+    } else {
+      passageId = `${usfmBook}.${chapter}.${tok.from}-${usfmBook}.${chapter}.${tok.to}`;
+    }
 
-  fetch(url)
-    .then(r => {
-      if (!r.ok) throw new Error(`Server returned ${r.status}`);
-      return r.json();
-    })
-    .then(data => {
-      // bible-api.com returns { text } for single verse or { verses:[{text}] } for ranges
-      let text = data.text;
-      if (!text && Array.isArray(data.verses)) {
-        text = data.verses.map(v => v.text.trim()).join(' ');
-      }
-      if (!text) throw new Error('No text in response');
-      const clean = text.replace(/\n/g, ' ').replace(/\s+/g, ' ').trim();
-      verseTextCache[cacheKey] = clean;
-      displayVerseText(clean);
-      setLookupStatus('', '');
-    })
-    .catch(err => {
-      setLookupStatus(`Lookup failed: ${err.message}`, 'error');
-    });
+    const url = `${APIBIBLE_BASE}/bibles/${apiBibleId}/passages/${passageId}` +
+                `?content-type=text&include-notes=false&include-titles=false` +
+                `&include-chapter-numbers=false&include-verse-numbers=false`;
+
+    fetch(url, { headers: { 'api-key': APIBIBLE_KEY } })
+      .then(r => { if (!r.ok) throw new Error(`HTTP ${r.status}`); return r.json(); })
+      .then(data => {
+        const text = data?.data?.content;
+        if (!text) throw new Error('No text in response');
+        finaliseLookup(cacheKey, text);
+      })
+      .catch(err => setLookupStatus(`Lookup failed: ${err.message}`, 'error'));
+    return;
+  }
+
+  // ── No API supports this translation ─────────────────────────────────────
+  setLookupStatus(
+    `${transAbbr} is not available for lookup. Supported: KJV, ASV, WEB, YLT, AMP, MSG, NASB, NASB95, LSV`,
+    'error'
+  );
+}
+
+function finaliseLookup(cacheKey, rawText) {
+  const clean = rawText.replace(/\n/g, ' ').replace(/\s+/g, ' ').trim();
+  verseTextCache[cacheKey] = clean;
+  displayVerseText(clean);
+  setLookupStatus('', '');
 }
 
 function setLookupStatus(msg, type) {
