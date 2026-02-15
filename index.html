@@ -321,6 +321,36 @@
             <div class="file-preview-wrap" id="lt-bg-preview-wrap" style="display:none">
               <img id="lt-bg-preview" class="file-preview-img" alt="Lower third background preview" />
             </div>
+            <!-- Background image fit/crop controls (shown once an image is loaded) -->
+            <div class="bg-fit-controls" id="bg-fit-controls" style="display:none">
+              <div class="setting-group">
+                <label class="setting-label" for="lt-bg-size">Image Fit</label>
+                <select id="lt-bg-size" onchange="onSettingsChange()">
+                  <option value="cover">Cover (fill, may crop)</option>
+                  <option value="contain">Contain (full image, no crop)</option>
+                  <option value="stretch">Stretch (exact fill)</option>
+                </select>
+              </div>
+              <div class="setting-group">
+                <label class="setting-label" for="lt-bg-position">Vertical Focus</label>
+                <select id="lt-bg-position" onchange="onSettingsChange()">
+                  <option value="center center">Center</option>
+                  <option value="top center">Top</option>
+                  <option value="bottom center">Bottom</option>
+                </select>
+              </div>
+              <div class="setting-group span-full">
+                <label class="setting-label" for="lt-min-height">
+                  Min Bar Height
+                  <span class="label-hint">keeps bar consistent when only 1 line shows</span>
+                </label>
+                <div class="slider-row">
+                  <input type="range" id="lt-min-height" min="0" max="240" step="10" value="0"
+                         oninput="onLtMinHeightInput()" onchange="onSettingsChange()" />
+                  <span class="slider-value" id="lt-min-height-val">auto</span>
+                </div>
+              </div>
+            </div>
           </div>
         </div>
 
@@ -351,6 +381,17 @@
                   <option value="right">Right side</option>
                 </select>
               </div>
+              <div class="setting-group span-full">
+                <label class="setting-label" for="logo-size">
+                  Logo Size
+                  <span class="label-hint">max height in output</span>
+                </label>
+                <div class="slider-row">
+                  <input type="range" id="logo-size" min="40" max="240" step="10" value="110"
+                         oninput="onLogoSizeInput()" onchange="onSettingsChange()" />
+                  <span class="slider-value" id="logo-size-val">110px</span>
+                </div>
+              </div>
             </div>
           </div>
         </div>
@@ -367,12 +408,24 @@
                 <input type="checkbox" id="use-custom-template" onchange="onSettingsChange()" />
                 Enable custom template (overrides all style settings)
               </label>
-              <button class="btn-reset-template" onclick="resetTemplate()">Load Example</button>
+              <div class="template-example-row">
+                <select id="template-example-select">
+                  <option value="classic">Classic Dark</option>
+                  <option value="bg-image">Background Image</option>
+                  <option value="logo-bar">Logo + Dark Bar</option>
+                  <option value="light">Minimal Light</option>
+                  <option value="scroll">Scripture Scroll</option>
+                </select>
+                <button class="btn-reset-template"
+                        onclick="loadTemplate(document.getElementById('template-example-select').value)">
+                  Load Example
+                </button>
+              </div>
             </div>
             <div class="template-fields">
               <div class="template-field-group">
                 <label class="setting-label">HTML
-                  <span class="label-hint">Variables: &#123;&#123;line1&#125;&#125; &#123;&#123;line2&#125;&#125; &#123;&#123;accentColor&#125;&#125; &#123;&#123;font&#125;&#125;</span>
+                  <span class="label-hint">Variables: &#123;&#123;line1&#125;&#125; &#123;&#123;line2&#125;&#125; &#123;&#123;accentColor&#125;&#125; &#123;&#123;font&#125;&#125; &#123;&#123;logoUrl&#125;&#125; &#123;&#123;bgUrl&#125;&#125;</span>
                 </label>
                 <textarea id="template-html" class="template-textarea" rows="6"
                   onchange="onSettingsChange()" oninput="onSettingsChange()"

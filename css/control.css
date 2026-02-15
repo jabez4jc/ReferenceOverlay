@@ -347,14 +347,18 @@ input::placeholder { color: var(--text-dim); }
   transition: background .3s;
 }
 
-/* Logo in preview */
+/* Logo in preview — mirrors output.css logic; JS sets --logo-max-h-preview */
 .lt-logo {
   display: block;
-  height: 100%;
+  height: auto;
+  max-height: var(--logo-max-h-preview, 36px);
   width: auto;
-  max-width: 18%;
+  max-width: 22%;
   object-fit: contain;
+  object-position: center;
   flex-shrink: 0;
+  align-self: center;
+  padding: 2px 3px;
   background: transparent;
 }
 .lt-logo.hidden { display: none; }
@@ -671,6 +675,51 @@ input[type="color"] {
   max-height: 56px;
   max-width: 116px;
   object-fit: contain;
+}
+
+/* ── Slider Controls ─────────────────────────────────────────────────────── */
+.slider-row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+.slider-row input[type="range"] {
+  flex: 1;
+  accent-color: var(--accent);
+  cursor: pointer;
+}
+.slider-value {
+  font-size: .8rem;
+  color: var(--text-muted);
+  min-width: 42px;
+  text-align: right;
+  font-variant-numeric: tabular-nums;
+}
+
+/* ── Background Image Fit Controls ──────────────────────────────────────── */
+.bg-fit-controls {
+  margin-top: 12px;
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 10px;
+}
+.bg-fit-controls .setting-group.span-full { grid-column: 1 / -1; }
+
+/* ── Template Example Row ───────────────────────────────────────────────── */
+.template-example-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-shrink: 0;
+}
+.template-example-row select {
+  padding: 4px 8px;
+  background: var(--surface-2);
+  border: 1px solid var(--border);
+  color: var(--text);
+  border-radius: var(--radius-sm);
+  font-size: .8rem;
+  cursor: pointer;
 }
 
 /* ── Lower Third Style Variants (preview) ─────────────────────────────────── */

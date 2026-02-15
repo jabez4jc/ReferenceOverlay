@@ -73,6 +73,10 @@ body.chroma-custom  { background: var(--chroma); }
   border-radius: 3px;
   box-shadow: 0 4px 32px rgba(0,0,0,.6);
 
+  /* Operator-controlled minimum height — keeps bg image consistent
+     when only one line is shown.  Default 0 (auto). */
+  min-height: var(--lt-min-h, 0px);
+
   /* Animation states */
   opacity: 0;
   transform: translateY(0);
@@ -105,14 +109,18 @@ body.chroma-custom  { background: var(--chroma); }
 
 /* ── Logo ─────────────────────────────────────────────────────────────────── */
 .lt-logo {
-  /* Constrained to lower-third height; width scales automatically */
   display: block;
-  height: 100%;
+  /* Height is controlled by the operator via --logo-max-h (set by output.js).
+     Using auto + max-height prevents an oversized logo from bloating the bar. */
+  height: auto;
+  max-height: var(--logo-max-h, 110px);
   width: auto;
-  max-width: 20%;          /* never wider than 20% of the bar */
+  max-width: 22%;          /* never wider than 22% of the bar */
   object-fit: contain;
   object-position: center;
   flex-shrink: 0;
+  align-self: center;      /* center vertically; don't stretch to full bar height */
+  padding: 6px 8px;
   background: transparent; /* preserve PNG transparency */
 }
 

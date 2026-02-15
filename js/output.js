@@ -164,15 +164,22 @@ function applySettings(s) {
 
   // ── Lower third background image ──────────────────────────────────────────
   if (s.ltBgImage) {
+    const bgSizeMap = { stretch: '100% 100%', contain: 'contain', cover: 'cover' };
     ltRoot.style.backgroundImage    = `url('${s.ltBgImage}')`;
-    ltRoot.style.backgroundSize     = 'cover';
-    ltRoot.style.backgroundPosition = 'center';
+    ltRoot.style.backgroundSize     = bgSizeMap[s.ltBgSize] || 'cover';
+    ltRoot.style.backgroundPosition = s.ltBgPosition || 'center center';
     ltRoot.style.backgroundRepeat   = 'no-repeat';
   } else {
     ltRoot.style.backgroundImage = '';
   }
 
+  // ── Min bar height (keeps bg image consistent on 1-line display) ──────────
+  document.documentElement.style.setProperty('--lt-min-h', (s.ltMinHeight || 0) + 'px');
+
   // ── Logo ──────────────────────────────────────────────────────────────────
+  // Logo max-height is controlled by the operator slider; --logo-max-h CSS var
+  document.documentElement.style.setProperty('--logo-max-h', (s.logoSize || 110) + 'px');
+
   if (s.logoDataUrl) {
     ltLogo.src           = s.logoDataUrl;
     ltLogo.style.display = '';
@@ -217,8 +224,10 @@ function substituteVars(str, s, data) {
   return str
     .replace(/\{\{line1\}\}/g,       (data && data.line1)  ? escapeHtml(data.line1)  : '')
     .replace(/\{\{line2\}\}/g,       (data && data.line2)  ? escapeHtml(data.line2)  : '')
-    .replace(/\{\{accentColor\}\}/g, s.accentColor || '#C8A951')
-    .replace(/\{\{font\}\}/g,        s.font         || 'system-ui');
+    .replace(/\{\{accentColor\}\}/g, s.accentColor  || '#C8A951')
+    .replace(/\{\{font\}\}/g,        s.font          || 'system-ui')
+    .replace(/\{\{logoUrl\}\}/g,     s.logoDataUrl   || '')
+    .replace(/\{\{bgUrl\}\}/g,       s.ltBgImage     || '');
 }
 
 function escapeHtml(str) {

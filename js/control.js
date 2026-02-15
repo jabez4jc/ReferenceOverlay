@@ -507,7 +507,9 @@ function substitutePreviewVars(str, s, data) {
     .replace(/\{\{line1\}\}/g,       data?.line1 ? escapeHtml(data.line1) : '')
     .replace(/\{\{line2\}\}/g,       data?.line2 ? escapeHtml(data.line2) : '')
     .replace(/\{\{accentColor\}\}/g, s.accentColor || '#C8A951')
-    .replace(/\{\{font\}\}/g,        s.font        || 'system-ui');
+    .replace(/\{\{font\}\}/g,        s.font        || 'system-ui')
+    .replace(/\{\{logoUrl\}\}/g,     s.logoDataUrl  || '')
+    .replace(/\{\{bgUrl\}\}/g,       s.ltBgImage    || '');
 }
 
 // ── Preview ───────────────────────────────────────────────────────────────────
@@ -554,12 +556,20 @@ function updatePreview() {
   lt.classList.add('style-' + settings.style);
 
   if (settings.ltBgImage) {
+    const bgSizeMap = { stretch: '100% 100%', contain: 'contain', cover: 'cover' };
     lt.style.backgroundImage    = `url('${settings.ltBgImage}')`;
-    lt.style.backgroundSize     = 'cover';
-    lt.style.backgroundPosition = 'center';
+    lt.style.backgroundSize     = bgSizeMap[settings.ltBgSize] || 'cover';
+    lt.style.backgroundPosition = settings.ltBgPosition || 'center center';
   } else {
     lt.style.backgroundImage = '';
   }
+
+  // Min-height scaled to the preview viewport (output ref = 1920px wide)
+  const previewVpWidth = document.querySelector('.preview-viewport')?.offsetWidth || 320;
+  const previewScale   = previewVpWidth / 1920;
+  lt.style.minHeight = settings.ltMinHeight
+    ? Math.round(settings.ltMinHeight * previewScale) + 'px'
+    : '';
 
   const accent = lt.querySelector('.lt-accent');
   if (accent) accent.style.background = settings.accentColor;
@@ -570,6 +580,9 @@ function updatePreview() {
     logoImg.classList.remove('hidden');
     logoImg.classList.toggle('logo-right', settings.logoPosition === 'right');
     logoImg.classList.toggle('logo-left',  settings.logoPosition !== 'right');
+    // Scale logo max-height to the preview viewport
+    logoImg.style.maxHeight = Math.round((settings.logoSize || 110) * previewScale) + 'px';
+    logoImg.style.height    = 'auto';
     if (settings.logoPosition === 'right') {
       lt.appendChild(logoImg);
     } else {
@@ -864,8 +877,12 @@ function getSettings() {
     outputRes:     document.getElementById('output-res')?.value       || '1920x1080',
     textAlign:     alignRadio ? alignRadio.value                      : 'center',
     ltBgImage:     ltBgDataUrl,
+    ltBgSize:      document.getElementById('lt-bg-size')?.value       || 'cover',
+    ltBgPosition:  document.getElementById('lt-bg-position')?.value   || 'center center',
+    ltMinHeight:   parseInt(document.getElementById('lt-min-height')?.value || '0'),
     logoDataUrl:   logoDataUrl,
     logoPosition:  document.getElementById('logo-position')?.value    || 'left',
+    logoSize:      parseInt(document.getElementById('logo-size')?.value || '110'),
     customTemplate: {
       enabled: document.getElementById('use-custom-template')?.checked || false,
       html:    document.getElementById('template-html')?.value         || '',
@@ -918,6 +935,17 @@ function loadSettings() {
     if (saved.outputRes)    document.getElementById('output-res').value      = saved.outputRes;
     if (saved.logoPosition) document.getElementById('logo-position').value   = saved.logoPosition;
 
+    if (saved.logoSize !== undefined) {
+      const el = document.getElementById('logo-size');
+      if (el) { el.value = saved.logoSize; document.getElementById('logo-size-val').textContent = saved.logoSize + 'px'; }
+    }
+    if (saved.ltBgSize)     { const el = document.getElementById('lt-bg-size');     if (el) el.value = saved.ltBgSize; }
+    if (saved.ltBgPosition) { const el = document.getElementById('lt-bg-position'); if (el) el.value = saved.ltBgPosition; }
+    if (saved.ltMinHeight !== undefined) {
+      const el = document.getElementById('lt-min-height');
+      if (el) { el.value = saved.ltMinHeight; document.getElementById('lt-min-height-val').textContent = saved.ltMinHeight > 0 ? saved.ltMinHeight + 'px' : 'auto'; }
+    }
+
     if (saved.textAlign) {
       const r = document.querySelector(`input[name="textAlign"][value="${saved.textAlign}"]`);
       if (r) r.checked = true;
@@ -943,41 +971,182 @@ function loadSettings() {
   } catch (_) {}
 }
 
-// ── Custom Template ───────────────────────────────────────────────────────────
-const DEFAULT_TEMPLATE_HTML = `<div class="custom-lt">
-  <div class="custom-lt-line1">{{line1}}</div>
-  <div class="custom-lt-line2">{{line2}}</div>
-</div>`;
+// ── Slider label helpers ──────────────────────────────────────────────────────
+function onLogoSizeInput() {
+  const v = document.getElementById('logo-size')?.value;
+  const label = document.getElementById('logo-size-val');
+  if (label && v !== undefined) label.textContent = v + 'px';
+}
 
-const DEFAULT_TEMPLATE_CSS = `.custom-lt {
+function onLtMinHeightInput() {
+  const v = parseInt(document.getElementById('lt-min-height')?.value || '0');
+  const label = document.getElementById('lt-min-height-val');
+  if (label) label.textContent = v > 0 ? v + 'px' : 'auto';
+}
+
+// ── Custom Template Examples ──────────────────────────────────────────────────
+// Template variables: {{line1}} {{line2}} {{accentColor}} {{font}}
+//                     {{logoUrl}} (logo data-URL)  {{bgUrl}} (bg image data-URL)
+
+const TEMPLATE_EXAMPLES = {
+
+  // ── 1. Classic Dark ─────────────────────────────────────────────────────────
+  'classic': {
+    html: `<div class="t-classic">
+  <div class="t-classic-accent"></div>
+  <div class="t-classic-text">
+    <div class="t-classic-line1">{{line1}}</div>
+    <div class="t-classic-line2">{{line2}}</div>
+  </div>
+</div>`,
+    css: `.t-classic {
+  display: flex;
+  align-items: stretch;
+  background: rgba(0,0,0,.88);
+  border-radius: 3px;
+  overflow: hidden;
+  box-shadow: 0 4px 32px rgba(0,0,0,.6);
+  font-family: {{font}};
+}
+.t-classic-accent { width: 8px; background: {{accentColor}}; flex-shrink: 0; }
+.t-classic-text { display: flex; flex-direction: column; justify-content: center; padding: 18px 28px; gap: 4px; }
+.t-classic-line1 { font-size: 52px; font-weight: 700; color: #fff; line-height: 1.15; }
+.t-classic-line2 { font-size: 34px; font-weight: 400; color: rgba(255,255,255,.75); }`,
+  },
+
+  // ── 2. Background Image ──────────────────────────────────────────────────────
+  // Requires a lower-third background image to be loaded (uses {{bgUrl}}).
+  'bg-image': {
+    html: `<div class="t-bgimg" style="background-image:url('{{bgUrl}}')">
+  <div class="t-bgimg-inner">
+    <div class="t-bgimg-line1">{{line1}}</div>
+    <div class="t-bgimg-line2">{{line2}}</div>
+  </div>
+</div>`,
+    css: `.t-bgimg {
+  background-size: cover;
+  background-position: center;
+  background-repeat: no-repeat;
+  min-height: 130px;
+  display: flex;
+  align-items: flex-end;
+  border-radius: 3px;
+  overflow: hidden;
+  position: relative;
+  font-family: {{font}};
+}
+.t-bgimg::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(to top, rgba(0,0,0,.85) 0%, rgba(0,0,0,.35) 55%, rgba(0,0,0,.05) 100%);
+}
+.t-bgimg-inner { position: relative; padding: 18px 28px; }
+.t-bgimg-line1 { font-size: 52px; font-weight: 700; color: #fff; text-shadow: 0 2px 12px rgba(0,0,0,.8); line-height: 1.15; }
+.t-bgimg-line2 { font-size: 34px; font-weight: 400; color: rgba(255,255,255,.88); text-shadow: 0 2px 8px rgba(0,0,0,.7); }`,
+  },
+
+  // ── 3. Logo + Dark Bar ───────────────────────────────────────────────────────
+  // Requires a logo to be loaded (uses {{logoUrl}}).
+  'logo-bar': {
+    html: `<div class="t-lb">
+  <div class="t-lb-logo-col">
+    <img src="{{logoUrl}}" class="t-lb-logo" alt="" />
+  </div>
+  <div class="t-lb-rule" style="background:{{accentColor}}"></div>
+  <div class="t-lb-text" style="font-family:{{font}}">
+    <div class="t-lb-line1">{{line1}}</div>
+    <div class="t-lb-line2">{{line2}}</div>
+  </div>
+</div>`,
+    css: `.t-lb {
+  display: flex;
+  align-items: stretch;
+  background: rgba(0,0,0,.88);
+  border-radius: 3px;
+  overflow: hidden;
+  box-shadow: 0 4px 32px rgba(0,0,0,.6);
+  min-height: 110px;
+}
+.t-lb-logo-col {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 12px 18px;
+  background: rgba(0,0,0,.3);
+  flex-shrink: 0;
+}
+.t-lb-logo { max-height: 80px; max-width: 160px; object-fit: contain; display: block; }
+.t-lb-rule { width: 4px; background: {{accentColor}}; flex-shrink: 0; }
+.t-lb-text { display: flex; flex-direction: column; justify-content: center; padding: 16px 24px; gap: 4px; flex: 1; }
+.t-lb-line1 { font-size: 52px; font-weight: 700; color: #fff; line-height: 1.15; }
+.t-lb-line2 { font-size: 34px; font-weight: 400; color: rgba(255,255,255,.75); }`,
+  },
+
+  // ── 4. Minimal Light ─────────────────────────────────────────────────────────
+  'light': {
+    html: `<div class="t-light">
+  <div class="t-light-rule" style="background:{{accentColor}}"></div>
+  <div class="t-light-body" style="font-family:{{font}}">
+    <div class="t-light-line1">{{line1}}</div>
+    <div class="t-light-line2">{{line2}}</div>
+  </div>
+</div>`,
+    css: `.t-light {
+  display: flex;
+  align-items: stretch;
+  background: rgba(255,255,255,.93);
+  backdrop-filter: blur(10px);
+  -webkit-backdrop-filter: blur(10px);
+  border-radius: 3px;
+  overflow: hidden;
+  box-shadow: 0 4px 24px rgba(0,0,0,.4);
+}
+.t-light-rule { width: 8px; background: {{accentColor}}; flex-shrink: 0; }
+.t-light-body { display: flex; flex-direction: column; justify-content: center; padding: 16px 28px; gap: 4px; }
+.t-light-line1 { font-size: 52px; font-weight: 700; color: #111; line-height: 1.15; }
+.t-light-line2 { font-size: 34px; font-weight: 400; color: rgba(0,0,0,.6); }`,
+  },
+
+  // ── 5. Scripture Scroll ──────────────────────────────────────────────────────
+  'scroll': {
+    html: `<div class="t-scroll">
+  <div class="t-scroll-rule" style="background:{{accentColor}}"></div>
+  <div class="t-scroll-body" style="font-family:{{font}}">
+    <div class="t-scroll-line1">{{line1}}</div>
+    <div class="t-scroll-sep" style="background:{{accentColor}}"></div>
+    <div class="t-scroll-line2">{{line2}}</div>
+  </div>
+  <div class="t-scroll-rule" style="background:{{accentColor}}"></div>
+</div>`,
+    css: `.t-scroll {
   display: flex;
   flex-direction: column;
-  justify-content: center;
-  padding: 18px 28px;
-  background: rgba(0,0,0,.82);
-  border-left: 8px solid {{accentColor}};
-  font-family: {{font}};
-  min-width: 400px;
+  background: rgba(10,8,6,.9);
+  border-radius: 2px;
+  overflow: hidden;
+  box-shadow: 0 4px 32px rgba(0,0,0,.7);
 }
-.custom-lt-line1 {
-  font-size: 52px;
-  font-weight: 700;
-  color: #fff;
-  line-height: 1.15;
-}
-.custom-lt-line2 {
-  font-size: 34px;
-  font-weight: 400;
-  color: rgba(255,255,255,.75);
-}`;
+.t-scroll-rule { height: 3px; flex-shrink: 0; }
+.t-scroll-body { padding: 18px 48px; display: flex; flex-direction: column; align-items: center; gap: 8px; }
+.t-scroll-line1 { font-size: 52px; font-weight: 600; color: #fff; text-align: center; line-height: 1.15; letter-spacing: .02em; }
+.t-scroll-sep   { width: 60px; height: 1px; }
+.t-scroll-line2 { font-size: 28px; font-weight: 300; color: rgba(255,255,255,.75); text-align: center; letter-spacing: .08em; text-transform: uppercase; }`,
+  },
 
-function resetTemplate() {
+};
+
+function loadTemplate(name) {
+  const tmpl = TEMPLATE_EXAMPLES[name] || TEMPLATE_EXAMPLES['classic'];
   const htmlEl = document.getElementById('template-html');
   const cssEl  = document.getElementById('template-css');
-  if (htmlEl) htmlEl.value = DEFAULT_TEMPLATE_HTML;
-  if (cssEl)  cssEl.value  = DEFAULT_TEMPLATE_CSS;
+  if (htmlEl) htmlEl.value = tmpl.html;
+  if (cssEl)  cssEl.value  = tmpl.css;
   onSettingsChange();
 }
+
+// Keep old name as alias so any saved references still work
+function resetTemplate() { loadTemplate('classic'); }
 
 // ── Lower Third Background Image ──────────────────────────────────────────────
 function onLtBgChange() {
@@ -993,19 +1162,21 @@ function onLtBgChange() {
 }
 
 function restoreLtBgUI(dataUrl, fileName) {
-  document.getElementById('lt-bg-name').textContent        = fileName || 'Custom background loaded';
-  document.getElementById('lt-bg-clear').style.display     = '';
+  document.getElementById('lt-bg-name').textContent           = fileName || 'Custom background loaded';
+  document.getElementById('lt-bg-clear').style.display        = '';
   document.getElementById('lt-bg-preview-wrap').style.display = '';
-  document.getElementById('lt-bg-preview').src             = dataUrl;
+  document.getElementById('lt-bg-preview').src                = dataUrl;
+  document.getElementById('bg-fit-controls').style.display    = '';
 }
 
 function clearLtBg() {
   ltBgDataUrl = null;
-  document.getElementById('lt-bg-file').value              = '';
-  document.getElementById('lt-bg-name').textContent        = 'No image selected';
-  document.getElementById('lt-bg-clear').style.display     = 'none';
+  document.getElementById('lt-bg-file').value                 = '';
+  document.getElementById('lt-bg-name').textContent           = 'No image selected';
+  document.getElementById('lt-bg-clear').style.display        = 'none';
   document.getElementById('lt-bg-preview-wrap').style.display = 'none';
-  document.getElementById('lt-bg-preview').src             = '';
+  document.getElementById('lt-bg-preview').src                = '';
+  document.getElementById('bg-fit-controls').style.display    = 'none';
   try { localStorage.removeItem('overlayLtBg-' + SESSION_ID); } catch (_) {}
   onSettingsChange();
 }
