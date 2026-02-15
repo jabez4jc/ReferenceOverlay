@@ -25,11 +25,12 @@
     </div>
     <div class="header-right">
       <span id="status-pill" class="status-pill status-off">OFF AIR</span>
+      <span id="ws-indicator" class="ws-indicator" data-state="offline" title="WebSocket server not running"></span>
       <button class="btn-session" id="btn-new-session" onclick="openNewSession()" title="Open a fresh independent session in a new tab">
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
         New Session
       </button>
-      <button class="btn-output-link" id="btn-open-output" onclick="openOutputWindow()">
+      <button class="btn-output-link" id="btn-open-output" onclick="openOutputWindow()" title="Open output window (click again for additional outputs)">
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"/><polyline points="15 3 21 3 21 9"/><line x1="10" y1="14" x2="21" y2="3"/></svg>
         Output Window
       </button>
@@ -83,6 +84,24 @@
           <select id="translation" onchange="onBibleChange()"></select>
         </div>
 
+        <!-- ── Verse Text Lookup ─────────────────────────────────────────── -->
+        <div class="field-group span-full">
+          <div class="lookup-bar">
+            <button class="btn-lookup" onclick="lookupVerse()">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
+              Look Up Text
+            </button>
+            <span id="lookup-status" class="lookup-status"></span>
+          </div>
+          <div id="verse-text-box" class="verse-text-box" style="display:none">
+            <p id="verse-text-content" class="verse-text-content"></p>
+            <label class="verse-text-include">
+              <input type="checkbox" id="include-verse-text" onchange="updatePreview()" />
+              Use verse text as line 2 in output
+            </label>
+          </div>
+        </div>
+
       </div>
     </section>
 
@@ -125,6 +144,20 @@
             </div>
           </div>
         </div>
+      </div>
+    </section>
+
+    <!-- ── Presets ────────────────────────────────────────────────────────── -->
+    <section class="presets-section">
+      <div class="presets-header">
+        <span class="presets-label">Presets</span>
+        <button class="btn-save-preset" onclick="saveCurrentPreset()">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M19 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11l5 5v11a2 2 0 0 1-2 2z"/><polyline points="17 21 17 13 7 13 7 21"/><polyline points="7 3 7 8 15 8"/></svg>
+          Save Current
+        </button>
+      </div>
+      <div class="presets-list" id="presets-list">
+        <span class="presets-empty" id="presets-empty">No presets saved — click Save Current to add one</span>
       </div>
     </section>
 
@@ -312,6 +345,39 @@
                   <option value="left">Left side</option>
                   <option value="right">Right side</option>
                 </select>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- Custom Lower-Third Template Editor -->
+        <div class="setting-row">
+          <div class="setting-group span-full">
+            <label class="setting-label template-section-label">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="16 18 22 12 16 6"/><polyline points="8 6 2 12 8 18"/></svg>
+              Custom HTML Template
+            </label>
+            <div class="template-enable-row">
+              <label class="template-toggle-label">
+                <input type="checkbox" id="use-custom-template" onchange="onSettingsChange()" />
+                Enable custom template (overrides all style settings)
+              </label>
+              <button class="btn-reset-template" onclick="resetTemplate()">Load Example</button>
+            </div>
+            <div class="template-fields">
+              <div class="template-field-group">
+                <label class="setting-label">HTML
+                  <span class="label-hint">Variables: &#123;&#123;line1&#125;&#125; &#123;&#123;line2&#125;&#125; &#123;&#123;accentColor&#125;&#125; &#123;&#123;font&#125;&#125;</span>
+                </label>
+                <textarea id="template-html" class="template-textarea" rows="6"
+                  onchange="onSettingsChange()" oninput="onSettingsChange()"
+                  placeholder="<div class=&quot;my-lt&quot;>&#10;  <div class=&quot;line1&quot;>{{line1}}</div>&#10;</div>"></textarea>
+              </div>
+              <div class="template-field-group">
+                <label class="setting-label">CSS</label>
+                <textarea id="template-css" class="template-textarea" rows="8"
+                  onchange="onSettingsChange()" oninput="onSettingsChange()"
+                  placeholder=".my-lt { background: rgba(0,0,0,.85); padding: 20px; }"></textarea>
               </div>
             </div>
           </div>

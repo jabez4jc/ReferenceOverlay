@@ -10,31 +10,38 @@ const SESSION_ID   = new URLSearchParams(location.search).get('session') || 'def
 const CHANNEL_NAME = 'reference-overlay-' + SESSION_ID;
 const LS_KEY       = 'referenceOverlayState-' + SESSION_ID;
 
-// DOM refs
-const body    = document.getElementById('output-body');
-const ltWrap  = document.getElementById('lt-wrap');
-const ltRoot  = document.getElementById('lt-root');
+// DOM refs — standard lower-third structure
+const body     = document.getElementById('output-body');
+const ltWrap   = document.getElementById('lt-wrap');
+const ltRoot   = document.getElementById('lt-root');
 const ltAccent = document.getElementById('lt-accent');
-const ltLogo  = document.getElementById('lt-logo');
-const ltText  = document.getElementById('lt-text');
-const ltLine1 = document.getElementById('lt-line1');
-const ltLine2 = document.getElementById('lt-line2');
+const ltLogo   = document.getElementById('lt-logo');
+const ltText   = document.getElementById('lt-text');
+const ltLine1  = document.getElementById('lt-line1');
+const ltLine2  = document.getElementById('lt-line2');
 
-// ── window.postMessage listener (primary — works on file:// and http://) ───────
+// DOM refs — custom template container
+const ltCustomWrap = document.getElementById('lt-custom-wrap');
+const ltCustom     = document.getElementById('lt-custom');
+
+// Tracks whether the custom template is active, so showOverlay knows which path to use
+let usingCustomTemplate = false;
+// Tracks the most recently applied settings so showOverlay can access them
+let currentSettings = {};
+
+// ── window.postMessage listener ───────────────────────────────────────────────
 window.addEventListener('message', e => {
   if (e.data && typeof e.data === 'object' && e.data.action) {
     handleMessage(e.data);
   }
 });
 
-// ── BroadcastChannel listener (hosted / same-origin tab scenario) ─────────────
+// ── BroadcastChannel listener ─────────────────────────────────────────────────
 let channel = null;
 try {
   channel = new BroadcastChannel(CHANNEL_NAME);
   channel.onmessage = e => handleMessage(e.data);
-} catch (_) {
-  // Fall through to localStorage polling
-}
+} catch (_) {}
 
 // ── LocalStorage fallback listener ────────────────────────────────────────────
 let lastTs = 0;
@@ -42,24 +49,21 @@ window.addEventListener('storage', e => {
   if (e.key === LS_KEY && e.newValue) {
     try {
       const msg = JSON.parse(e.newValue);
-      if (msg._ts && msg._ts > lastTs) {
-        lastTs = msg._ts;
-        handleMessage(msg);
-      }
+      if (msg._ts && msg._ts > lastTs) { lastTs = msg._ts; handleMessage(msg); }
     } catch (_) {}
   }
 });
 
-// Also check localStorage on load (handles page-refresh during live show)
+// ── DOMContentLoaded ──────────────────────────────────────────────────────────
 window.addEventListener('DOMContentLoaded', () => {
   applyInitialSettings();
   restoreLastState();
+  initWebSocket();
 });
 
 // ── Message Handler ───────────────────────────────────────────────────────────
 function handleMessage(msg) {
   if (!msg || !msg.action) return;
-
   switch (msg.action) {
     case 'show':
       if (msg.settings) applySettings(msg.settings);
@@ -78,16 +82,21 @@ function handleMessage(msg) {
 function showOverlay(data) {
   if (!data) return;
 
-  ltLine1.textContent   = data.line1 || '';
-  ltLine2.textContent   = data.line2 || '';
-  ltLine2.style.display = data.line2 ? '' : 'none';
+  if (usingCustomTemplate) {
+    // Substitute template variables and inject into custom container
+    renderCustomTemplate(currentSettings, data);
+    ltCustomWrap.classList.remove('visible');
+    void ltCustomWrap.offsetWidth;   // force reflow so transition fires
+    ltCustomWrap.classList.add('visible');
+  } else {
+    ltLine1.textContent   = data.line1 || '';
+    ltLine2.textContent   = data.line2 || '';
+    ltLine2.style.display = data.line2 ? '' : 'none';
+    ltRoot.classList.remove('visible');
+    void ltRoot.offsetWidth;
+    ltRoot.classList.add('visible');
+  }
 
-  // Force reflow so CSS transition fires even on re-show
-  ltRoot.classList.remove('visible');
-  void ltRoot.offsetWidth;
-  ltRoot.classList.add('visible');
-
-  // Persist for page reload
   try {
     sessionStorage.setItem('overlayLive', JSON.stringify({ data, ts: Date.now() }));
   } catch (_) {}
@@ -95,22 +104,18 @@ function showOverlay(data) {
 
 function hideOverlay() {
   ltRoot.classList.remove('visible');
+  if (ltCustomWrap) ltCustomWrap.classList.remove('visible');
   try { sessionStorage.removeItem('overlayLive'); } catch (_) {}
 }
 
 // ── Apply Settings ────────────────────────────────────────────────────────────
 function applySettings(s) {
   if (!s) return;
+  currentSettings = s;
 
-  // ── Chroma key background colour ──────────────────────────────────────────
+  // ── Chroma key background ─────────────────────────────────────────────────
   body.classList.remove('chroma-blue', 'chroma-green', 'chroma-magenta', 'chroma-custom');
-
-  const chromaMap = {
-    '#0000ff': 'chroma-blue',
-    '#00b140': 'chroma-green',
-    '#ff00ff': 'chroma-magenta',
-  };
-
+  const chromaMap = { '#0000ff': 'chroma-blue', '#00b140': 'chroma-green', '#ff00ff': 'chroma-magenta' };
   const cls = chromaMap[s.chroma?.toLowerCase()];
   if (cls) {
     body.classList.add(cls);
@@ -129,7 +134,7 @@ function applySettings(s) {
                           'style-gradient', 'style-solid', 'style-split', 'style-frosted');
   ltRoot.classList.add('style-' + (s.style || 'classic'));
 
-  // ── Accent colour ──────────────────────────────────────────────────────────
+  // ── Accent colour ─────────────────────────────────────────────────────────
   if (s.accentColor && ltAccent) {
     ltAccent.style.background = s.accentColor;
     document.documentElement.style.setProperty('--accent-color', s.accentColor);
@@ -138,6 +143,10 @@ function applySettings(s) {
   // ── Position ──────────────────────────────────────────────────────────────
   ltWrap.classList.remove('pos-lower', 'pos-upper', 'pos-center');
   ltWrap.classList.add('pos-' + (s.position || 'lower'));
+  if (ltCustomWrap) {
+    ltCustomWrap.classList.remove('pos-lower', 'pos-upper', 'pos-center');
+    ltCustomWrap.classList.add('pos-' + (s.position || 'lower'));
+  }
 
   // ── Font ──────────────────────────────────────────────────────────────────
   if (s.font) {
@@ -165,39 +174,75 @@ function applySettings(s) {
 
   // ── Logo ──────────────────────────────────────────────────────────────────
   if (s.logoDataUrl) {
-    ltLogo.src         = s.logoDataUrl;
+    ltLogo.src           = s.logoDataUrl;
     ltLogo.style.display = '';
-
-    // Apply position class
     ltLogo.classList.remove('logo-left', 'logo-right');
     ltLogo.classList.add(s.logoPosition === 'right' ? 'logo-right' : 'logo-left');
-
-    // Re-order in DOM to match position setting
     if (s.logoPosition === 'right') {
-      // Right of text block: move logo to end of ltRoot
       ltRoot.appendChild(ltLogo);
     } else {
-      // Left of text block: insert after accent strip
       ltRoot.insertBefore(ltLogo, ltText);
     }
   } else {
     ltLogo.style.display = 'none';
     ltLogo.src           = '';
   }
+
+  // ── Custom template ────────────────────────────────────────────────────────
+  const tmpl = s.customTemplate;
+  usingCustomTemplate = !!(tmpl && tmpl.enabled && tmpl.html);
+
+  if (usingCustomTemplate) {
+    ltWrap.style.display       = 'none';
+    ltCustomWrap.style.display = '';
+    // Inject CSS
+    let styleEl = document.getElementById('custom-template-style');
+    if (!styleEl) {
+      styleEl    = document.createElement('style');
+      styleEl.id = 'custom-template-style';
+      document.head.appendChild(styleEl);
+    }
+    styleEl.textContent = substituteVars(tmpl.css || '', s, null);
+  } else {
+    ltWrap.style.display       = '';
+    ltCustomWrap.style.display = 'none';
+    // Remove injected CSS if template was just turned off
+    const styleEl = document.getElementById('custom-template-style');
+    if (styleEl) styleEl.textContent = '';
+  }
+}
+
+// ── Custom Template Rendering ─────────────────────────────────────────────────
+function substituteVars(str, s, data) {
+  return str
+    .replace(/\{\{line1\}\}/g,       (data && data.line1)  ? escapeHtml(data.line1)  : '')
+    .replace(/\{\{line2\}\}/g,       (data && data.line2)  ? escapeHtml(data.line2)  : '')
+    .replace(/\{\{accentColor\}\}/g, s.accentColor || '#C8A951')
+    .replace(/\{\{font\}\}/g,        s.font         || 'system-ui');
+}
+
+function escapeHtml(str) {
+  return String(str)
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;');
+}
+
+function renderCustomTemplate(s, data) {
+  if (!ltCustom || !s.customTemplate) return;
+  const html = substituteVars(s.customTemplate.html || '', s, data);
+  ltCustom.innerHTML = html;
 }
 
 // ── Apply settings from localStorage on load ──────────────────────────────────
 function applyInitialSettings() {
   try {
     const saved = JSON.parse(localStorage.getItem('overlaySettings-' + SESSION_ID) || '{}');
-
-    // Restore images from their own localStorage keys
-    const ltBg = localStorage.getItem('overlayLtBg-' + SESSION_ID);
-    if (ltBg) saved.ltBgImage = ltBg;
-
-    const logo = localStorage.getItem('overlayLogo-' + SESSION_ID);
-    if (logo) saved.logoDataUrl = logo;
-
+    const ltBg  = localStorage.getItem('overlayLtBg-' + SESSION_ID);
+    if (ltBg)  saved.ltBgImage   = ltBg;
+    const logo  = localStorage.getItem('overlayLogo-' + SESSION_ID);
+    if (logo)  saved.logoDataUrl = logo;
     if (Object.keys(saved).length) applySettings(saved);
   } catch (_) {}
 }
@@ -206,12 +251,9 @@ function applyInitialSettings() {
 function restoreLastState() {
   try {
     const live = JSON.parse(sessionStorage.getItem('overlayLive') || 'null');
-    if (live && live.data) {
-      setTimeout(() => showOverlay(live.data), 100);
-    }
+    if (live && live.data) setTimeout(() => showOverlay(live.data), 100);
   } catch (_) {}
 
-  // Also check localStorage for the last broadcast
   try {
     const last = JSON.parse(localStorage.getItem(LS_KEY) || 'null');
     if (last && last.action === 'show' && last.data) {
@@ -219,5 +261,19 @@ function restoreLastState() {
       applySettings(last.settings);
       setTimeout(() => showOverlay(last.data), 150);
     }
+  } catch (_) {}
+}
+
+// ── WebSocket Client (server.js mode) ─────────────────────────────────────────
+let ws = null;
+const WS_PORT = parseInt(location.port) || 3333;
+
+function initWebSocket() {
+  if (location.protocol === 'file:') return;
+  const url = `ws://${location.hostname}:${WS_PORT}?session=${SESSION_ID}&role=output`;
+  try {
+    ws = new WebSocket(url);
+    ws.onmessage = e => { try { handleMessage(JSON.parse(e.data)); } catch (_) {} };
+    ws.onclose   = () => { ws = null; setTimeout(initWebSocket, 5000); };
   } catch (_) {}
 }

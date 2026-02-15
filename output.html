@@ -33,6 +33,7 @@
   -->
   <div class="stage" id="stage">
 
+    <!-- Standard lower-third (hidden when custom template is active) -->
     <div class="lower-third-wrap" id="lt-wrap">
       <div class="lower-third" id="lt-root">
         <div class="lt-accent" id="lt-accent"></div>
@@ -43,6 +44,11 @@
           <div class="lt-line2" id="lt-line2"></div>
         </div>
       </div>
+    </div>
+
+    <!-- Custom template container: activated when a custom HTML template is enabled -->
+    <div class="lower-third-wrap lt-custom-wrap" id="lt-custom-wrap" style="display:none">
+      <div id="lt-custom"></div>
     </div>
 
   </div>

@@ -233,6 +233,22 @@ body.chroma-custom  { background: var(--chroma); }
 .style-split .lt-line2   { color: rgba(255,255,255,.85); text-shadow: 0 2px 6px rgba(0,0,0,.8); }
 .style-split .lower-third { box-shadow: none; }
 
+/* ── Custom Template Wrap ─────────────────────────────────────────────────── */
+/* Shares positioning with the standard lower-third-wrap but renders
+   whatever HTML the operator has written in the template editor. */
+.lt-custom-wrap {
+  /* inherits .lower-third-wrap positioning */
+  opacity: 0;
+  transition: opacity .45s ease;
+}
+.lt-custom-wrap.visible { opacity: 1; }
+
+/* Slide animation carries over when wrap has anim class from JS */
+.anim-slide .lt-custom-wrap               { transform: translateY(60px); transition: opacity .45s ease, transform .45s ease; }
+.anim-slide .lt-custom-wrap.visible       { transform: translateY(0); }
+.anim-none  .lt-custom-wrap               { transition: none; }
+.anim-none  .lt-custom-wrap.visible       { opacity: 1; }
+
 /* ── Style: frosted glass (light panel, dark text) ────────────────────────── */
 .style-frosted .lt-text {
   background: rgba(255,255,255,.78);

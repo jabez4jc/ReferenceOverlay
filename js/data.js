@@ -175,6 +175,18 @@ const TRANSLATIONS = [
   { abbr: 'NIV84',  name: 'New International Version (1984)' },
 ];
 
+// Maps our translation abbreviations to bible-api.com query parameters.
+// Only translations the free API actually serves are listed here.
+// Unsupported translations will show a helpful message in the lookup UI.
+const BIBLE_API_MAP = {
+  'KJV':   'kjv',
+  'ASV':   'asv',
+  'WEB':   'web',
+  'YLT':   'ylt',
+  'DARBY': 'darby',
+  'BBE':   'bbe',
+};
+
 // Font definitions for the font picker
 // Google Fonts are loaded in index.html / output.html <head>
 const FONT_OPTIONS = [

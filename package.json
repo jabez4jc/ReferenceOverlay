@@ -1,0 +1,17 @@
+{
+  "name": "reference-overlay",
+  "version": "2.0.0",
+  "description": "Browser-based lower-third overlay controller for live video production",
+  "main": "server.js",
+  "scripts": {
+    "start": "node server.js",
+    "install-deps": "npm install"
+  },
+  "dependencies": {
+    "ws": "^8.18.0"
+  },
+  "engines": {
+    "node": ">=16"
+  },
+  "license": "MIT"
+}
