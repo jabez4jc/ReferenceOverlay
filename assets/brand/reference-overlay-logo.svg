@@ -1,0 +1,23 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1000 280" role="img" aria-labelledby="title desc">
+  <title id="title">Overlay Logo</title>
+  <desc id="desc">Overlay wordmark with app icon.</desc>
+  <defs>
+    <linearGradient id="bg" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0" stop-color="#1a2031"/>
+      <stop offset="1" stop-color="#101522"/>
+    </linearGradient>
+    <linearGradient id="gold" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0" stop-color="#efd89c"/>
+      <stop offset="1" stop-color="#b58f3b"/>
+    </linearGradient>
+  </defs>
+
+  <rect x="20" y="20" width="240" height="240" rx="54" fill="url(#bg)"/>
+  <rect x="40" y="40" width="200" height="200" rx="40" fill="none" stroke="url(#gold)" stroke-width="12"/>
+
+  <circle cx="140" cy="132" r="48" fill="none" stroke="#f4f7ff" stroke-width="20"/>
+  <rect x="108" y="178" width="84" height="28" rx="8" fill="#f4f7ff" opacity=".96"/>
+  <rect x="90" y="198" width="84" height="28" rx="8" fill="url(#gold)"/>
+
+  <text x="300" y="168" fill="#f3f6ff" font-family="Avenir Next, Montserrat, Segoe UI, sans-serif" font-weight="700" font-size="92" letter-spacing="4">OVERLAY</text>
+</svg>

@@ -1,4 +1,4 @@
-# Reference Overlay
+# Overlay
 
 A browser-based lower-third overlay controller for live video production.
 Displays **Bible references** (book · chapter · verse · translation) or
@@ -124,7 +124,7 @@ Settings are saved to `localStorage` and restored on next open.
 ## File Structure
 
 ```
-ReferenceOverlay/
+Overlay/
 ├── index.html        Control panel (operator view)
 ├── output.html       Chroma-key output window
 ├── css/

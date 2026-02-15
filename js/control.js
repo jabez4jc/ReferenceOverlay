@@ -597,7 +597,7 @@ function openOutputWindow() {
 
   const win = window.open(
     'output.html?session=' + SESSION_ID,
-    'ReferenceOverlayOutput-' + SESSION_ID + '-' + idx,
+    'OverlayOutput-' + SESSION_ID + '-' + idx,
     `width=${w},height=${h},left=${left},top=${top},` +
     `resizable=yes,scrollbars=no,toolbar=no,menubar=no,location=no,status=no`
   );
