@@ -173,11 +173,12 @@ const TRANSLATIONS = [
   { abbr: 'ICB',    name: "International Children's Bible" },
   { abbr: 'WEB',    name: 'World English Bible' },
   { abbr: 'NIV84',  name: 'New International Version (1984)' },
+  // ── Available via api.bible ────────────────────────────────────────────────
+  { abbr: 'LSV',    name: 'Literal Standard Version' },
 ];
 
-// Maps our translation abbreviations to bible-api.com query parameters.
-// Only translations the free API actually serves are listed here.
-// Unsupported translations will show a helpful message in the lookup UI.
+// ── bible-api.com  (free, no key, public-domain translations) ─────────────────
+// Maps our translation abbreviations to bible-api.com ?translation= parameters.
 const BIBLE_API_MAP = {
   'KJV':   'kjv',
   'ASV':   'asv',
@@ -185,6 +186,43 @@ const BIBLE_API_MAP = {
   'YLT':   'ylt',
   'DARBY': 'darby',
   'BBE':   'bbe',
+};
+
+// ── api.bible  (https://rest.api.bible — requires API key) ────────────────────
+// Maps our translation abbreviations to their Bible ID on rest.api.bible.
+// Only translations confirmed available under the configured API key are listed.
+const APIBIBLE_IDS = {
+  'AMP':    'a81b73293d3080c9-01',   // Amplified Bible
+  'MSG':    '6f11a7de016f942e-01',   // The Message
+  'NASB':   'b8ee27bcd1cae43a-01',   // New American Standard Bible 1995
+  'NASB95': 'b8ee27bcd1cae43a-01',   // NASB 1995 (same text)
+  'LSV':    '01b29f4b342acc35-01',   // Literal Standard Version
+};
+
+// USFM book codes used by api.bible passage IDs  (e.g. "John 3:16" → "JHN.3.16")
+const USFM_CODES = {
+  'Genesis':         'GEN', 'Exodus':          'EXO', 'Leviticus':       'LEV',
+  'Numbers':         'NUM', 'Deuteronomy':     'DEU', 'Joshua':          'JOS',
+  'Judges':          'JDG', 'Ruth':            'RUT', '1 Samuel':        '1SA',
+  '2 Samuel':        '2SA', '1 Kings':         '1KI', '2 Kings':         '2KI',
+  '1 Chronicles':    '1CH', '2 Chronicles':    '2CH', 'Ezra':            'EZR',
+  'Nehemiah':        'NEH', 'Esther':          'EST', 'Job':             'JOB',
+  'Psalms':          'PSA', 'Proverbs':        'PRO', 'Ecclesiastes':    'ECC',
+  'Song of Solomon': 'SNG', 'Isaiah':          'ISA', 'Jeremiah':        'JER',
+  'Lamentations':    'LAM', 'Ezekiel':         'EZK', 'Daniel':          'DAN',
+  'Hosea':           'HOS', 'Joel':            'JOL', 'Amos':            'AMO',
+  'Obadiah':         'OBA', 'Jonah':           'JON', 'Micah':           'MIC',
+  'Nahum':           'NAM', 'Habakkuk':        'HAB', 'Zephaniah':       'ZEP',
+  'Haggai':          'HAG', 'Zechariah':       'ZEC', 'Malachi':         'MAL',
+  'Matthew':         'MAT', 'Mark':            'MRK', 'Luke':            'LUK',
+  'John':            'JHN', 'Acts':            'ACT', 'Romans':          'ROM',
+  '1 Corinthians':   '1CO', '2 Corinthians':   '2CO', 'Galatians':       'GAL',
+  'Ephesians':       'EPH', 'Philippians':     'PHP', 'Colossians':      'COL',
+  '1 Thessalonians': '1TH', '2 Thessalonians': '2TH', '1 Timothy':       '1TI',
+  '2 Timothy':       '2TI', 'Titus':           'TIT', 'Philemon':        'PHM',
+  'Hebrews':         'HEB', 'James':           'JAS', '1 Peter':         '1PE',
+  '2 Peter':         '2PE', '1 John':          '1JN', '2 John':          '2JN',
+  '3 John':          '3JN', 'Jude':            'JUD', 'Revelation':      'REV',
 };
 
 // Font definitions for the font picker
