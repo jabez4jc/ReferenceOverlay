@@ -31,10 +31,13 @@ body {
 }
 
 /* Chroma colour classes applied on <body> by JS */
-body.chroma-blue    { background: #0000FF; }
-body.chroma-green   { background: #00B140; }
-body.chroma-magenta { background: #FF00FF; }
-body.chroma-custom  { background: var(--chroma); }
+body.chroma-blue        { background: #0000FF; }
+body.chroma-green       { background: #00B140; }
+body.chroma-magenta     { background: #FF00FF; }
+body.chroma-custom      { background: var(--chroma); }
+/* Transparent — for OBS/vMix/Wirecast Browser Source with 'Allow transparency' enabled.
+   No chroma key filter needed; the browser compositor handles the alpha channel. */
+body.chroma-transparent { background: transparent !important; }
 
 /* ── Session watermark (operator reference — not part of keyed content) ──── */
 /* Fixed in the top-right corner with a non-chroma background so it survives

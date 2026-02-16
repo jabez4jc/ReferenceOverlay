@@ -183,16 +183,20 @@ function applySettings(s) {
   if (!s) return;
   currentSettings = s;
 
-  // ── Chroma key background ─────────────────────────────────────────────────
-  body.classList.remove('chroma-blue', 'chroma-green', 'chroma-magenta', 'chroma-custom');
-  const chromaMap = { '#0000ff': 'chroma-blue', '#00b140': 'chroma-green', '#ff00ff': 'chroma-magenta' };
-  const cls = chromaMap[s.chroma?.toLowerCase()];
-  if (cls) {
-    body.classList.add(cls);
-    body.style.background = '';
-  } else if (s.chroma) {
-    body.classList.add('chroma-custom');
-    body.style.background = s.chroma;
+  // ── Chroma key / transparent background ───────────────────────────────────
+  body.classList.remove('chroma-blue', 'chroma-green', 'chroma-magenta', 'chroma-custom', 'chroma-transparent');
+  body.style.background = '';
+  if (s.chroma === 'transparent') {
+    body.classList.add('chroma-transparent');
+  } else {
+    const chromaMap = { '#0000ff': 'chroma-blue', '#00b140': 'chroma-green', '#ff00ff': 'chroma-magenta' };
+    const cls = chromaMap[s.chroma?.toLowerCase()];
+    if (cls) {
+      body.classList.add(cls);
+    } else if (s.chroma) {
+      body.classList.add('chroma-custom');
+      body.style.background = s.chroma;
+    }
   }
 
   // ── Animation ─────────────────────────────────────────────────────────────

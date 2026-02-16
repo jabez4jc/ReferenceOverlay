@@ -74,6 +74,20 @@ document.addEventListener('DOMContentLoaded', () => {
   // Display short session ID in the header badge
   const sessionBadge = document.getElementById('session-id-text');
   if (sessionBadge) sessionBadge.textContent = '#' + SESSION_ID;
+
+  // Populate the Browser Source URL in the settings panel
+  const bsiUrl = document.getElementById('bsi-url');
+  if (bsiUrl) {
+    const outputUrl = location.origin
+      + location.pathname.replace(/[^/]*$/, '')
+      + 'output.html?session=' + SESSION_ID;
+    bsiUrl.textContent = outputUrl;
+  }
+
+  // Restore transparent note visibility
+  const savedChroma = document.querySelector('input[name="chroma"]:checked')?.value;
+  const note = document.getElementById('chroma-transparent-note');
+  if (note) note.style.display = (savedChroma === 'transparent') ? '' : 'none';
 });
 
 // ── Populate Dropdowns ────────────────────────────────────────────────────────
@@ -1195,6 +1209,9 @@ function onSettingsChange() {
   const settings = getSettings();
   broadcast({ action: 'settings', settings });
   persistSettings(settings);
+  // Toggle transparent-mode helper note
+  const note = document.getElementById('chroma-transparent-note');
+  if (note) note.style.display = (settings.chroma === 'transparent') ? '' : 'none';
 }
 
 function onCustomChromaChange() {
@@ -1265,6 +1282,11 @@ function loadSettings() {
       const el = document.getElementById('show-session-watermark');
       if (el) el.checked = saved.showSessionWatermark;
     }
+
+    // Restore transparent note visibility after chroma is restored
+    const restoredChroma = document.querySelector('input[name="chroma"]:checked')?.value;
+    const chromaNote = document.getElementById('chroma-transparent-note');
+    if (chromaNote) chromaNote.style.display = (restoredChroma === 'transparent') ? '' : 'none';
 
     // Restore images
     const savedLtBg = localStorage.getItem('overlayLtBg-' + SESSION_ID);

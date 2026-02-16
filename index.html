@@ -343,6 +343,36 @@
                        oninput="onCustomChromaChange()" onchange="onCustomChromaChange()" />
                 Custom
               </label>
+              <label class="chroma-opt">
+                <input type="radio" name="chroma" value="transparent" onchange="onSettingsChange()" />
+                <span class="chroma-swatch chroma-swatch-alpha"></span>
+                Transparent
+              </label>
+            </div>
+            <!-- Transparent mode note -->
+            <div class="chroma-transparent-note" id="chroma-transparent-note" style="display:none">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg>
+              <span><strong>Transparent mode</strong> — for OBS/vMix/Wirecast Browser Source. In OBS: right-click the source → Properties → check <em>Allow transparency</em>. No chroma key filter needed.</span>
+            </div>
+          </div>
+        </div>
+
+        <!-- Browser Source Connection -->
+        <div class="setting-row">
+          <div class="setting-group span-full">
+            <label class="setting-label">Browser Source Setup</label>
+            <div class="browser-source-info">
+              <div class="bsi-row">
+                <span class="bsi-label">Output URL</span>
+                <code class="bsi-url" id="bsi-url">—</code>
+                <button class="bsi-copy" onclick="copyOutputLink()" title="Copy URL">
+                  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="9" y="9" width="13" height="13" rx="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></svg>
+                </button>
+              </div>
+              <div class="bsi-notes">
+                <p><strong>OBS / vMix:</strong> Add a Browser Source → paste the URL above → set width/height to match your output resolution → tick <em>Allow transparency</em> if using Transparent mode above, or add a Chroma Key filter if using a colour background.</p>
+                <p><strong>Cross-device control (phone → TV):</strong> Run <code>node server.js</code> on the same computer that serves the files. Use the server's IP address in the URL above. Both the control panel and the Browser Source must connect via <code>http://</code> (not <code>file://</code>) for messages to relay through the WebSocket server.</p>
+              </div>
             </div>
           </div>
         </div>
