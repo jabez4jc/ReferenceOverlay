@@ -83,12 +83,15 @@ try {
 const wss = new WebSocketServer({ server });
 
 // rooms:        Map<sessionId, Set<WebSocket>>
-// sessionState: Map<sessionId, { settings: string|null, overlay: string|null }>
+// sessionState: Map<sessionId, { settings: string|null, show: string|null }>
+//   'show' stores only the last 'show' payload — 'clear' does NOT overwrite it,
+//   so late-joining output clients (OBS Browser Source) always receive the last
+//   live overlay state, not an empty clear.
 const rooms        = new Map();
 const sessionState = new Map();
 
 function getState(sessionId) {
-  if (!sessionState.has(sessionId)) sessionState.set(sessionId, { settings: null, overlay: null });
+  if (!sessionState.has(sessionId)) sessionState.set(sessionId, { settings: null, show: null });
   return sessionState.get(sessionId);
 }
 
@@ -133,8 +136,8 @@ wss.on('connection', (ws, req) => {
     if (state.settings) {
       try { ws.send(state.settings); } catch (_) {}
     }
-    if (state.overlay) {
-      try { ws.send(state.overlay); } catch (_) {}
+    if (state.show) {
+      try { ws.send(state.show); } catch (_) {}
     }
   }
 
@@ -146,8 +149,8 @@ wss.on('connection', (ws, req) => {
       const state = getState(sessionId);
       if (msg.action === 'settings') {
         state.settings = raw.toString();
-      } else if (msg.action === 'show' || msg.action === 'clear') {
-        state.overlay = raw.toString();
+      } else if (msg.action === 'show') {
+        state.show = raw.toString();   // only 'show' is cached; 'clear' leaves it intact
       }
     } catch (_) { /* non-JSON messages are forwarded as-is */ }
 
@@ -161,6 +164,13 @@ wss.on('connection', (ws, req) => {
   });
 
   ws.on('error', () => leaveRoom(ws));
+});
+
+// ── Graceful Shutdown ─────────────────────────────────────────────────────────
+process.on('SIGINT', () => {
+  console.log('\n  Shutting down…');
+  wss.clients.forEach(c => { try { c.close(); } catch (_) {} });
+  server.close(() => process.exit(0));
 });
 
 // ── Start ─────────────────────────────────────────────────────────────────────

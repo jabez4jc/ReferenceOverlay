@@ -41,7 +41,6 @@ let logoDataUrl  = null;
 let verseTextCurrent    = null;   // last successfully fetched verse text
 let verseTextCache      = {};     // { cacheKey: { text, refOnly } }
 let referenceOnlyLookup = false;  // true when text is ASV reference, not for output
-let lookupTimer         = null;   // debounce handle
 
 // Presets — separate stores for overlay (bible/speaker) vs ticker
 let overlayPresets = [];
@@ -1250,17 +1249,20 @@ function updateOutputCount() {
 // ── WebSocket Client (server.js mode) ─────────────────────────────────────────
 // Automatically connects when the app is served via http:// rather than file://.
 // Lets tablets/phones on the same network control this session as a remote.
+let wsRetryDelay = 5000;   // starts at 5 s; doubles on each failure, caps at 60 s
+
 function initWebSocket() {
   if (location.protocol === 'file:') return;   // WS only available on http://
 
   const url = `ws://${location.hostname}:${WS_PORT}?session=${SESSION_ID}&role=control`;
   try {
     ws = new WebSocket(url);
-    ws.onopen    = () => setWsIndicator('online');
+    ws.onopen    = () => { wsRetryDelay = 5000; setWsIndicator('online'); };
     ws.onclose   = () => {
       ws = null;
       setWsIndicator('offline');
-      setTimeout(initWebSocket, 5000);   // auto-reconnect
+      setTimeout(initWebSocket, wsRetryDelay);
+      wsRetryDelay = Math.min(wsRetryDelay * 2, 60000);
     };
     ws.onerror   = () => setWsIndicator('error');
     ws.onmessage = e => {
