@@ -62,9 +62,12 @@ window.addEventListener('storage', e => {
 
 // ── DOMContentLoaded ──────────────────────────────────────────────────────────
 window.addEventListener('DOMContentLoaded', () => {
-  // Label output window with session ID for operator reference
+  // Label output window with session ID; hidden by default until Settings enables it
   const watermark = document.getElementById('session-watermark');
-  if (watermark) watermark.textContent = '#' + SESSION_ID;
+  if (watermark) {
+    watermark.textContent    = '#' + SESSION_ID;
+    watermark.style.display  = 'none';   // hidden until operator enables it in Settings
+  }
   const titleEl = document.getElementById('output-title');
   if (titleEl) titleEl.textContent = 'Output — #' + SESSION_ID;
 
@@ -241,6 +244,10 @@ function applySettings(s) {
   } else {
     ltRoot.style.backgroundImage = '';
   }
+
+  // ── Session watermark (operator reference — toggled via Settings) ─────────
+  const watermark = document.getElementById('session-watermark');
+  if (watermark) watermark.style.display = s.showSessionWatermark ? '' : 'none';
 
   // ── Min bar height (keeps bg image consistent on 1-line display) ──────────
   document.documentElement.style.setProperty('--lt-min-h', (s.ltMinHeight || 0) + 'px');

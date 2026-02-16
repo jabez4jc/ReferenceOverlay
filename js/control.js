@@ -668,12 +668,17 @@ function updatePreview() {
 }
 
 // ── Presets ───────────────────────────────────────────────────────────────────
+// Preset storage uses global keys (no session ID) so presets are shared across
+// all sessions on the same browser. Use Export / Import to move between devices.
+const PRESET_KEY_OVERLAY = 'overlayPresets';
+const PRESET_KEY_TICKER  = 'tickerPresets';
+
 function loadPresets() {
   try {
-    overlayPresets = JSON.parse(localStorage.getItem('overlayPresets-' + SESSION_ID) || '[]');
+    overlayPresets = JSON.parse(localStorage.getItem(PRESET_KEY_OVERLAY) || '[]');
   } catch (_) { overlayPresets = []; }
   try {
-    tickerPresets  = JSON.parse(localStorage.getItem('tickerPresets-'  + SESSION_ID) || '[]');
+    tickerPresets  = JSON.parse(localStorage.getItem(PRESET_KEY_TICKER)  || '[]');
   } catch (_) { tickerPresets  = []; }
   renderPresets();
 }
@@ -775,8 +780,52 @@ function deletePreset(id) {
 }
 
 function savePresetsToStorage() {
-  try { localStorage.setItem('overlayPresets-' + SESSION_ID, JSON.stringify(overlayPresets)); } catch (_) {}
-  try { localStorage.setItem('tickerPresets-'  + SESSION_ID, JSON.stringify(tickerPresets));  } catch (_) {}
+  try { localStorage.setItem(PRESET_KEY_OVERLAY, JSON.stringify(overlayPresets)); } catch (_) {}
+  try { localStorage.setItem(PRESET_KEY_TICKER,  JSON.stringify(tickerPresets));  } catch (_) {}
+}
+
+// ── Preset Export / Import ─────────────────────────────────────────────────────
+function exportPresets() {
+  const payload = JSON.stringify({ overlayPresets, tickerPresets }, null, 2);
+  const blob    = new Blob([payload], { type: 'application/json' });
+  const url     = URL.createObjectURL(blob);
+  const a       = document.createElement('a');
+  a.href        = url;
+  a.download    = 'overlay-presets.json';
+  a.click();
+  URL.revokeObjectURL(url);
+}
+
+function importPresets() {
+  const input = document.createElement('input');
+  input.type  = 'file';
+  input.accept = '.json,application/json';
+  input.onchange = e => {
+    const file = e.target.files[0];
+    if (!file) return;
+    const reader = new FileReader();
+    reader.onload = ev => {
+      try {
+        const data = JSON.parse(ev.target.result);
+        // Merge: add imported presets that don't already exist by id
+        const mergeIn = (target, incoming) => {
+          const existingIds = new Set(target.map(p => p.id));
+          incoming.forEach(p => { if (!existingIds.has(p.id)) target.push(p); });
+        };
+        if (Array.isArray(data.overlayPresets)) mergeIn(overlayPresets, data.overlayPresets);
+        if (Array.isArray(data.tickerPresets))  mergeIn(tickerPresets,  data.tickerPresets);
+        savePresetsToStorage();
+        renderPresets();
+        const countO = Array.isArray(data.overlayPresets) ? data.overlayPresets.length : 0;
+        const countT = Array.isArray(data.tickerPresets)  ? data.tickerPresets.length  : 0;
+        alert(`Imported ${countO} overlay preset(s) and ${countT} ticker preset(s).`);
+      } catch (_) {
+        alert('Import failed — file does not appear to be a valid presets export.');
+      }
+    };
+    reader.readAsText(file);
+  };
+  input.click();
 }
 
 function renderPresets() {
@@ -1044,6 +1093,7 @@ function getSettings() {
       html:    document.getElementById('template-html')?.value         || '',
       css:     document.getElementById('template-css')?.value          || '',
     },
+    showSessionWatermark: document.getElementById('show-session-watermark')?.checked || false,
   };
 }
 
@@ -1115,6 +1165,12 @@ function loadSettings() {
       if (enableEl && saved.customTemplate.enabled !== undefined) enableEl.checked = saved.customTemplate.enabled;
       if (htmlEl   && saved.customTemplate.html    !== undefined) htmlEl.value    = saved.customTemplate.html;
       if (cssEl    && saved.customTemplate.css     !== undefined) cssEl.value     = saved.customTemplate.css;
+    }
+
+    // Restore watermark toggle
+    if (saved.showSessionWatermark !== undefined) {
+      const el = document.getElementById('show-session-watermark');
+      if (el) el.checked = saved.showSessionWatermark;
     }
 
     // Restore images

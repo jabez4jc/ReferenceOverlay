@@ -237,10 +237,20 @@
     <section class="presets-section">
       <div class="presets-header">
         <span class="presets-label" id="presets-label">Reference &amp; Speaker Presets</span>
-        <button class="btn-save-preset" onclick="saveCurrentPreset()">
-          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M19 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11l5 5v11a2 2 0 0 1-2 2z"/><polyline points="17 21 17 13 7 13 7 21"/><polyline points="7 3 7 8 15 8"/></svg>
-          Save Current
-        </button>
+        <div class="presets-actions">
+          <button class="btn-save-preset" onclick="saveCurrentPreset()" title="Save current settings as a preset">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M19 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11l5 5v11a2 2 0 0 1-2 2z"/><polyline points="17 21 17 13 7 13 7 21"/><polyline points="7 3 7 8 15 8"/></svg>
+            Save
+          </button>
+          <button class="btn-preset-io" onclick="exportPresets()" title="Export all presets as a JSON file — open on another device to import">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
+            Export
+          </button>
+          <button class="btn-preset-io" onclick="importPresets()" title="Import presets from a JSON file — merges with existing presets">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3" transform="rotate(180 12 9)"/></svg>
+            Import
+          </button>
+        </div>
       </div>
       <!-- Overlay presets (Bible + Speaker) -->
       <div class="presets-list" id="presets-list-overlay">
@@ -479,6 +489,17 @@
                 </div>
               </div>
             </div>
+          </div>
+        </div>
+
+        <!-- Output Window Watermark -->
+        <div class="setting-row">
+          <div class="setting-group span-full">
+            <label class="setting-label">Output Window</label>
+            <label class="template-toggle-label">
+              <input type="checkbox" id="show-session-watermark" onchange="onSettingsChange()" />
+              Show session ID watermark on output window (for confirming correct session pairing)
+            </label>
           </div>
         </div>
 
