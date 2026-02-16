@@ -82,8 +82,15 @@ try {
 
 const wss = new WebSocketServer({ server });
 
-// rooms: Map<sessionId, Set<WebSocket>>
-const rooms = new Map();
+// rooms:        Map<sessionId, Set<WebSocket>>
+// sessionState: Map<sessionId, { settings: string|null, overlay: string|null }>
+const rooms        = new Map();
+const sessionState = new Map();
+
+function getState(sessionId) {
+  if (!sessionState.has(sessionId)) sessionState.set(sessionId, { settings: null, overlay: null });
+  return sessionState.get(sessionId);
+}
 
 function joinRoom(sessionId, ws) {
   if (!rooms.has(sessionId)) rooms.set(sessionId, new Set());
@@ -93,7 +100,10 @@ function joinRoom(sessionId, ws) {
 function leaveRoom(ws) {
   for (const [id, clients] of rooms) {
     clients.delete(ws);
-    if (clients.size === 0) rooms.delete(id);
+    if (clients.size === 0) {
+      rooms.delete(id);
+      sessionState.delete(id);   // clean up state when room is empty
+    }
   }
 }
 
@@ -116,7 +126,31 @@ wss.on('connection', (ws, req) => {
   const room = rooms.get(sessionId);
   console.log(`  [WS+] ${role.padEnd(8)} session=${sessionId}  (room: ${room ? room.size : 0} clients)`);
 
+  // Replay current state to a newly connected output client so it shows the
+  // correct overlay immediately even if it joined after CUT TO AIR was sent.
+  if (role === 'output') {
+    const state = getState(sessionId);
+    if (state.settings) {
+      try { ws.send(state.settings); } catch (_) {}
+    }
+    if (state.overlay) {
+      try { ws.send(state.overlay); } catch (_) {}
+    }
+  }
+
   ws.on('message', raw => {
+    // Cache settings and overlay actions so late-joining output clients
+    // (e.g. OBS Browser Source) get the current state on connect.
+    try {
+      const msg = JSON.parse(raw);
+      const state = getState(sessionId);
+      if (msg.action === 'settings') {
+        state.settings = raw.toString();
+      } else if (msg.action === 'show' || msg.action === 'clear') {
+        state.overlay = raw.toString();
+      }
+    } catch (_) { /* non-JSON messages are forwarded as-is */ }
+
     // Relay message to all other clients in the same session room
     broadcastToRoom(sessionId, raw, ws);
   });
