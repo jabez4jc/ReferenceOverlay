@@ -26,6 +26,13 @@ let overlayVisible = false;
 let tickerActive   = false;
 let outputWindows  = [];        // ← array for multiple simultaneous targets
 
+// Program state — frozen snapshot of what is currently live on output
+let programOverlayData     = null;
+let programOverlaySettings = null;
+let programOverlayLive     = false;
+let programTickerData      = null;
+let programTickerLive      = false;
+
 // In-memory image stores (large files may not fit in localStorage)
 let ltBgDataUrl  = null;
 let logoDataUrl  = null;
@@ -888,38 +895,124 @@ function sendShow() {
     const td = buildTickerData();
     if (!td.message) return;
     broadcast({ action: 'show-ticker', data: td });
+    programTickerData = td;
+    programTickerLive = true;
     setTickerStatus(true);
+    updateProgramMonitor();
     return;
   }
   const data     = buildOverlayData();
   const settings = getSettings();
   broadcast({ action: 'show', data, settings });
+  programOverlayData     = data;
+  programOverlaySettings = settings;
+  programOverlayLive     = true;
   setOverlayStatus(true);
+  updateProgramMonitor();
   updatePreview();
 }
 
 function sendClear() {
   if (currentMode === 'ticker') {
     broadcast({ action: 'clear-ticker' });
+    programTickerData = null;
+    programTickerLive = false;
     setTickerStatus(false);
+    updateProgramMonitor();
     return;
   }
   broadcast({ action: 'clear' });
+  programOverlayData     = null;
+  programOverlaySettings = null;
+  programOverlayLive     = false;
   setOverlayStatus(false);
+  updateProgramMonitor();
 }
 
 function setOverlayStatus(visible) {
   overlayVisible = visible;
+  const anyLive = visible || tickerActive;
   const pill = document.getElementById('status-pill');
-  pill.className   = 'status-pill ' + (visible ? 'status-live' : 'status-off');
-  pill.textContent = visible ? 'LIVE' : 'OFF AIR';
+  pill.className   = 'status-pill ' + (anyLive ? 'status-live' : 'status-off');
+  pill.textContent = visible && tickerActive ? 'LIVE + TICKER'
+                   : visible                 ? 'LIVE'
+                   : tickerActive            ? 'TICKER LIVE'
+                   :                          'OFF AIR';
+  document.getElementById('monitor-program-block')?.classList.toggle('live', anyLive);
 }
 
 function setTickerStatus(live) {
   tickerActive = live;
+  const anyLive = overlayVisible || live;
   const pill = document.getElementById('status-pill');
-  pill.className   = 'status-pill ' + (live ? 'status-live' : 'status-off');
-  pill.textContent = live ? 'TICKER LIVE' : 'OFF AIR';
+  pill.className   = 'status-pill ' + (anyLive ? 'status-live' : 'status-off');
+  pill.textContent = overlayVisible && live ? 'LIVE + TICKER'
+                   : live                   ? 'TICKER LIVE'
+                   : overlayVisible         ? 'LIVE'
+                   :                          'OFF AIR';
+  document.getElementById('monitor-program-block')?.classList.toggle('live', anyLive);
+}
+
+// ── Program Monitor Renderer ──────────────────────────────────────────────────
+// Renders a frozen snapshot of what is currently live into the PGM viewport.
+function updateProgramMonitor() {
+  const pgmWrap        = document.getElementById('program-wrap');
+  const pgmLt          = document.getElementById('program-lower-third');
+  const pgmLine1       = document.getElementById('program-line1');
+  const pgmLine2       = document.getElementById('program-line2');
+  const pgmAccent      = document.getElementById('program-accent');
+  const pgmLogo        = document.getElementById('program-logo');
+  const pgmLtText      = document.getElementById('program-lt-text');
+  const pgmTickerWrap  = document.getElementById('program-ticker-wrap');
+  const pgmTickerBar   = document.getElementById('program-ticker-bar');
+  const pgmTickerBadge = document.getElementById('program-ticker-badge');
+  const pgmTickerText  = document.getElementById('program-ticker-text');
+  const offAir         = document.getElementById('program-off-air');
+
+  const anythingLive = programOverlayLive || programTickerLive;
+  if (offAir) offAir.style.display = anythingLive ? 'none' : '';
+
+  // ── Overlay (lower-third or speaker) ───────────────────────────────────────
+  if (programOverlayLive && programOverlayData) {
+    if (pgmWrap) pgmWrap.style.display = '';
+
+    if (pgmLine1) pgmLine1.textContent = programOverlayData.line1 || '';
+    if (pgmLine2) {
+      pgmLine2.textContent   = programOverlayData.line2 || '';
+      pgmLine2.style.display = programOverlayData.line2 ? '' : 'none';
+    }
+
+    const s = programOverlaySettings;
+    if (s) {
+      if (pgmLt)     pgmLt.className            = 'lower-third style-' + (s.style || 'classic');
+      if (pgmAccent) pgmAccent.style.background  = s.accentColor || '#C8A951';
+      if (pgmLtText) {
+        pgmLtText.style.fontFamily = s.font      || 'system-ui';
+        pgmLtText.style.textAlign  = s.textAlign || 'center';
+      }
+      if (pgmLogo) {
+        if (s.logoDataUrl) { pgmLogo.src = s.logoDataUrl; pgmLogo.classList.remove('hidden'); }
+        else                               pgmLogo.classList.add('hidden');
+      }
+    }
+  } else {
+    if (pgmWrap) pgmWrap.style.display = 'none';
+  }
+
+  // ── Ticker ─────────────────────────────────────────────────────────────────
+  if (programTickerLive && programTickerData) {
+    if (pgmTickerWrap) pgmTickerWrap.style.display = '';
+    const td = programTickerData;
+    if (pgmTickerBar) {
+      pgmTickerBar.style.background = td.bgColor   || '#cc0000';
+      pgmTickerBar.style.color      = td.textColor || '#ffffff';
+    }
+    if (pgmTickerBadge) pgmTickerBadge.textContent = td.label   || '⚠ ALERT';
+    if (pgmTickerText)  pgmTickerText.textContent  = td.message || '';
+    if (pgmTickerWrap)  pgmTickerWrap.classList.toggle('pos-top', td.position === 'top');
+  } else {
+    if (pgmTickerWrap) pgmTickerWrap.style.display = 'none';
+  }
 }
 
 // ── Broadcast ─────────────────────────────────────────────────────────────────
