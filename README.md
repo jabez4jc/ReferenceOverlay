@@ -23,6 +23,8 @@ network.
 - **Keyboard shortcuts** — CUT, CLEAR, mode switch, output open
 - **Fully offline** — no CDN dependencies after `npm install`
 
+![Reference Overlay control panel — Bible Reference mode](assets/screenshots/control-panel.png)
+
 ---
 
 ## How It Works
@@ -125,7 +127,7 @@ curl -fsSL https://deb.nodesource.com/setup_20.x | sudo -E bash -
 sudo apt-get install -y nodejs
 
 # Clone the repository
-git clone https://github.com/your-org/reference-overlay.git /var/www/reference-overlay
+git clone https://github.com/jabez4jc/Overlay.git /var/www/reference-overlay
 cd /var/www/reference-overlay
 npm install
 ```
@@ -292,6 +294,8 @@ the same browser. If you need OBS Browser Source, deploy Option B or C instead.
 6. Click **OK**. The server terminal should show `room: 2 clients` for your session.
 7. Type a reference and click **CUT TO AIR**.
 
+![Output window composited over live video in OBS via Browser Source](assets/screenshots/output-obs.png)
+
 ### Wirecast
 
 1. Add a **Window Capture** shot layer pointing to an open Output Window
@@ -332,6 +336,10 @@ the same browser. If you need OBS Browser Source, deploy Option B or C instead.
 Verse text is fetched live from [bible-api.com](https://bible-api.com) (public domain
 translations) or api.bible (premium translations). Results are cached for the session.
 
+![Output window — Bible reference overlay on chroma key background](assets/screenshots/output-reference.png)
+
+![Output window — alternate Bible reference overlay view](assets/screenshots/output-reference2.png)
+
 ### Speaker / Lower Third
 
 | Field | Notes |
@@ -370,6 +378,8 @@ translations) or api.bible (premium translations). Results are cached for the se
 | **Browser Source Setup** | Displays the output URL for your current session with a copy button |
 
 All settings are saved to `localStorage` and restored automatically on next open.
+
+![Settings panel — chroma key, browser source setup, animation and style options](assets/screenshots/settings-panel.png)
 
 ---
 
