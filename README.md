@@ -338,6 +338,8 @@ translations) or api.bible (premium translations). Results are cached for the se
 
 ![Output window — Bible reference overlay on chroma key background](assets/screenshots/output-reference.png)
 
+![Output window — alternate Bible reference overlay view](assets/screenshots/output-reference2.png)
+
 ### Speaker / Lower Third
 
 | Field | Notes |
