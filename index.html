@@ -248,7 +248,7 @@
               <div class="lt-accent"></div>
               <img class="lt-logo hidden" id="preview-logo" alt="Logo" />
               <div class="lt-text">
-                <div class="lt-line1" id="preview-line1">Revelation 3:19</div>
+                <div class="lt-line1" id="preview-line1">John 3:16-18</div>
                 <div class="lt-line2" id="preview-line2">King James Version</div>
               </div>
             </div>
@@ -396,7 +396,9 @@
               <option value="accent">Accent line</option>
               <option value="minimal">Minimal — text only</option>
               <option value="outline">Outlined text</option>
-              <option value="gradient">Gradient fade</option>
+              <option value="gradient" selected>Gradient fade</option>
+              <option value="scripture">Scripture Wrap — full passage</option>
+              <option value="scripture-panel">Scripture Panel — high-capacity</option>
               <option value="solid">Solid — Accent fill</option>
               <option value="split">Split lines</option>
               <option value="frosted">Frosted glass</option>
@@ -427,12 +429,12 @@
             <label class="setting-label">Text Alignment</label>
             <div class="align-options">
               <label class="align-opt">
-                <input type="radio" name="textAlign" value="left" onchange="onSettingsChange()" />
+                <input type="radio" name="textAlign" value="left" checked onchange="onSettingsChange()" />
                 <svg viewBox="0 0 20 14" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><line x1="1" y1="2" x2="19" y2="2"/><line x1="1" y1="7" x2="13" y2="7"/><line x1="1" y1="12" x2="16" y2="12"/></svg>
                 Left
               </label>
               <label class="align-opt">
-                <input type="radio" name="textAlign" value="center" checked onchange="onSettingsChange()" />
+                <input type="radio" name="textAlign" value="center" onchange="onSettingsChange()" />
                 <svg viewBox="0 0 20 14" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><line x1="1" y1="2" x2="19" y2="2"/><line x1="4" y1="7" x2="16" y2="7"/><line x1="2" y1="12" x2="18" y2="12"/></svg>
                 Center
               </label>
@@ -610,6 +612,20 @@
                   onchange="onSettingsChange()" oninput="onSettingsChange()"
                   placeholder=".my-lt { background: rgba(0,0,0,.85); padding: 20px; }"></textarea>
               </div>
+            </div>
+            <div class="template-preset-row">
+              <select id="template-preset-select" class="template-preset-select">
+                <option value="">No template presets yet</option>
+              </select>
+              <button class="btn-reset-template" onclick="saveTemplatePreset()" title="Save current custom HTML/CSS as a reusable template preset">
+                Save Template Preset
+              </button>
+              <button class="btn-reset-template" onclick="loadSelectedTemplatePreset()" title="Load selected template preset">
+                Load Preset
+              </button>
+              <button class="btn-reset-template" onclick="deleteSelectedTemplatePreset()" title="Delete selected template preset">
+                Delete
+              </button>
             </div>
           </div>
         </div>

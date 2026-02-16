@@ -45,11 +45,13 @@ let referenceOnlyLookup = false;  // true when text is ASV reference, not for ou
 // Presets — separate stores for overlay (bible/speaker) vs ticker
 let overlayPresets = [];
 let tickerPresets  = [];
+let templatePresets = [];
 
 // Communication channels (BroadcastChannel primary; localStorage fallback)
 // All keys are namespaced with SESSION_ID so multiple users don't collide.
 const CHANNEL_NAME = 'reference-overlay-' + SESSION_ID;
 const LS_KEY       = 'referenceOverlayState-' + SESSION_ID;
+const GLOBAL_TEMPLATE_KEY = 'overlayCustomTemplateGlobal';
 let channel        = null;
 
 try {
@@ -102,8 +104,9 @@ function populateBooks() {
     (b.testament === 'OT' ? otGroup : ntGroup).appendChild(opt);
   });
   const bookEl = document.getElementById('book');
-  bookEl.value = 'Revelation';
-  populateChapters('Revelation', 3);
+  bookEl.value = 'John';
+  populateChapters('John', 3);
+  document.getElementById('verse-ref').value = '16-18';
 }
 
 function populateChapters(bookName, selectedChapter) {
@@ -139,17 +142,25 @@ function populateTranslations() {
   const grpRef     = document.createElement('optgroup');
   grpRef.label     = 'Reference Only';
 
-  TRANSLATIONS.forEach(t => {
+  function hasFreeSource(t) {
+    return !!(((t.bg && canUseBibleGatewayProxy())) || BIBLE_API_MAP[t.abbr] || HELLOAO_MAP[t.abbr]);
+  }
+  function hasPremiumSource(t) {
+    return !!APIBIBLE_IDS[t.abbr];
+  }
+  function makeOption(t) {
     const opt = document.createElement('option');
     opt.value       = t.abbr;
     opt.textContent = `${t.abbr} — ${t.name}`;
-    if (BIBLE_API_MAP[t.abbr] || HELLOAO_MAP[t.abbr]) {
-      grpFree.appendChild(opt);
-    } else if (APIBIBLE_IDS[t.abbr]) {
-      grpPremium.appendChild(opt);
-    } else {
-      grpRef.appendChild(opt);
-    }
+    return opt;
+  }
+
+  TRANSLATIONS.forEach(t => {
+    const free = hasFreeSource(t);
+    const premium = hasPremiumSource(t);
+    if (free) grpFree.appendChild(makeOption(t));
+    if (premium) grpPremium.appendChild(makeOption(t)); // appears in both when both are available
+    if (!free && !premium) grpRef.appendChild(makeOption(t));
   });
 
   sel.appendChild(grpFree);
@@ -173,7 +184,7 @@ function populateFonts() {
     opt.textContent = f.label;
     sel.lastElementChild.appendChild(opt);
   });
-  sel.value = 'system-ui';
+  sel.value = "'Cinzel', serif";
 }
 
 // ── Mode Toggle ───────────────────────────────────────────────────────────────
@@ -337,8 +348,9 @@ function formatVerseRef(raw, maxVerse) {
 }
 
 // ── Bible API — Verse Text Lookup ─────────────────────────────────────────────
-// Three-tier lookup:
-//   Tier 1: bible-api.com (free, no key)      — KJV, ASV, WEB, YLT, DARBY, BBE
+// Four-tier lookup:
+//   Tier 0: local /api/verse proxy (BibleGateway scraper via server.js, free)
+//   Tier 1: bible-api.com (free, no key)       — KJV, ASV, WEB, YLT, DARBY, BBE
 //   Tier 2: rest.api.bible (API key)           — AMP, MSG, NASB, NASB95, LSV
 //   Tier 3: bible.helloao.org (free, no key)   — BSB
 //   Fallback: ASV via Tier 1 (reference-only) — unsupported translations & NONE
@@ -359,11 +371,7 @@ function pruneCacheIfNeeded(cache, max) {
   if (keys.length >= max) delete cache[keys[0]];  // evict oldest (insertion order)
 }
 
-// ── Superscript verse number helpers ──────────────────────────────────────────
-const _SUPER_DIGITS = ['⁰','¹','²','³','⁴','⁵','⁶','⁷','⁸','⁹'];
-function toSuperNum(n) {
-  return String(n).split('').map(d => _SUPER_DIGITS[+d]).join('');
-}
+// ── Verse number helpers ──────────────────────────────────────────────────────
 function countTokenVerses(tokens) {
   return tokens.reduce((n, t) => n + (t.type === 'single' ? 1 : t.to - t.from + 1), 0);
 }
@@ -392,7 +400,130 @@ function extractApiVerseMap(content) {
   return verseMap;
 }
 
-function lookupVerse() {
+function canUseBibleGatewayProxy() {
+  return location.protocol !== 'file:';
+}
+
+function expandVerseTokens(tokens) {
+  const verses = [];
+  for (const tok of tokens) {
+    if (tok.type === 'single') verses.push(tok.v);
+    else for (let i = tok.from; i <= tok.to; i++) verses.push(i);
+  }
+  return verses;
+}
+
+async function fetchBibleGatewayText(book, chapter, validTokens, transAbbr, prefixed) {
+  const bgVersion = BIBLEGATEWAY_MAP[transAbbr] || transAbbr;
+  const verseList = expandVerseTokens(validTokens);
+  const parts = [];
+
+  // Fetch each verse individually so we can preserve superscript numbering format.
+  for (const verseNum of verseList) {
+    const url = `/api/verse?book=${encodeURIComponent(book)}&chapter=${encodeURIComponent(chapter)}&verses=${verseNum}&version=${encodeURIComponent(bgVersion)}`;
+    const r = await fetch(url);
+    if (!r.ok) throw new Error(`BibleGateway HTTP ${r.status}`);
+    const data = await r.json();
+    const text = (data?.passage || '').replace(/\s+/g, ' ').trim();
+    if (text) parts.push(prefixed(verseNum, text));
+  }
+
+  if (!parts.length) throw new Error('No text from BibleGateway');
+  return parts.join(' ');
+}
+
+async function fetchBibleApiText(book, chapter, validTokens, transAbbr, prefixed, isRefOnly) {
+  const freeApiTrans = isRefOnly ? 'asv' : BIBLE_API_MAP[transAbbr];
+  if (!freeApiTrans) throw new Error('bible-api not configured for translation');
+  const verseParam = validTokens.map(t =>
+    t.type === 'single' ? String(t.v) : `${t.from}-${t.to}`
+  ).join(',');
+  const ref = `${book} ${chapter}:${verseParam}`;
+  const url = `https://bible-api.com/${encodeURIComponent(ref)}?translation=${freeApiTrans}`;
+  const r = await fetch(url);
+  if (!r.ok) throw new Error(`bible-api HTTP ${r.status}`);
+  const data = await r.json();
+  if (Array.isArray(data.verses) && data.verses.length > 0) {
+    return data.verses.map(v => prefixed(v.verse, v.text.trim())).join(' ');
+  }
+  if (data.text) return data.text.trim();
+  throw new Error('No text in bible-api response');
+}
+
+async function fetchApiBibleText(book, chapter, validTokens, transAbbr, prefixed) {
+  const apiBibleId = APIBIBLE_IDS[transAbbr];
+  if (!apiBibleId) throw new Error('api.bible not configured for translation');
+  const usfmBook = USFM_CODES[book];
+  if (!usfmBook) throw new Error('Book not recognised for API lookup.');
+  const chapCacheKey = `${transAbbr}|${book}|${chapter}`;
+
+  function applyVerseMap(verseMap) {
+    const parts = [];
+    for (const tok of validTokens) {
+      if (tok.type === 'single') {
+        if (verseMap[tok.v]) parts.push(prefixed(tok.v, verseMap[tok.v]));
+      } else {
+        for (let i = tok.from; i <= tok.to; i++) {
+          if (verseMap[i]) parts.push(prefixed(i, verseMap[i]));
+        }
+      }
+    }
+    const text = parts.join(' ');
+    if (!text) throw new Error('Verses not found in chapter data');
+    return text;
+  }
+
+  if (apiBibleChapterCache[chapCacheKey]) {
+    return applyVerseMap(apiBibleChapterCache[chapCacheKey]);
+  }
+
+  const chapUrl = `${APIBIBLE_BASE}/bibles/${apiBibleId}/chapters/${usfmBook}.${chapter}` +
+    `?content-type=json&include-notes=false&include-titles=false` +
+    `&include-chapter-numbers=false&include-verse-numbers=false`;
+  const r = await fetch(chapUrl, { headers: { 'api-key': APIBIBLE_KEY } });
+  if (!r.ok) throw new Error(`api.bible HTTP ${r.status}`);
+  const data = await r.json();
+  const verseMap = extractApiVerseMap(data?.data?.content || []);
+  pruneCacheIfNeeded(apiBibleChapterCache, MAX_CHAPTER_CACHE);
+  apiBibleChapterCache[chapCacheKey] = verseMap;
+  return applyVerseMap(verseMap);
+}
+
+async function fetchHelloAoText(book, chapter, validTokens, transAbbr, prefixed) {
+  const helloaoId = HELLOAO_MAP[transAbbr];
+  if (!helloaoId) throw new Error('helloao not configured for translation');
+  const usfmBook = USFM_CODES[book];
+  if (!usfmBook) throw new Error('Book not recognised for API lookup.');
+  const url = `${HELLOAO_BASE}/${helloaoId}/${usfmBook}/${chapter}.json`;
+  const r = await fetch(url);
+  if (!r.ok) throw new Error(`helloao HTTP ${r.status}`);
+  const data = await r.json();
+  const verses = (data?.chapter?.content || []).filter(c => c.type === 'verse');
+  const verseMap = {};
+  for (const v of verses) {
+    const text = v.content
+      .filter(c => typeof c === 'string')
+      .join(' ')
+      .replace(/\s+/g, ' ')
+      .trim();
+    if (text) verseMap[v.number] = text;
+  }
+  const parts = [];
+  for (const tok of validTokens) {
+    if (tok.type === 'single') {
+      if (verseMap[tok.v]) parts.push(prefixed(tok.v, verseMap[tok.v]));
+    } else {
+      for (let i = tok.from; i <= tok.to; i++) {
+        if (verseMap[i]) parts.push(prefixed(i, verseMap[i]));
+      }
+    }
+  }
+  const text = parts.join(' ');
+  if (!text) throw new Error('No text in helloao response');
+  return text;
+}
+
+async function lookupVerse() {
   const book      = document.getElementById('book').value;
   const chapter   = document.getElementById('chapter').value;
   const verseRaw  = document.getElementById('verse-ref').value.trim();
@@ -420,9 +551,11 @@ function lookupVerse() {
     return;
   }
 
-  // Determine if this translation has no API support — fall back to ASV for reference
-  const isSupported = !!(BIBLE_API_MAP[transAbbr] || APIBIBLE_IDS[transAbbr] || HELLOAO_MAP[transAbbr]);
-  const isRefOnly   = (transAbbr === 'NONE') || !isSupported;
+  const bgProxySupported = (transAbbr !== 'NONE') && canUseBibleGatewayProxy() && !!(BIBLEGATEWAY_MAP[transAbbr] || TRANSLATIONS.find(t => t.abbr === transAbbr)?.bg);
+  const hasFreeSource    = !!(bgProxySupported || BIBLE_API_MAP[transAbbr] || HELLOAO_MAP[transAbbr]);
+  const hasPremiumSource = !!APIBIBLE_IDS[transAbbr];
+  const isSupported      = hasFreeSource || hasPremiumSource;
+  const isRefOnly        = (transAbbr === 'NONE') || !isSupported;
 
   // Canonical cache key. Reference-only lookups share a single ASV-sourced cache entry.
   const verseKey = validTokens.map(t =>
@@ -440,124 +573,39 @@ function lookupVerse() {
 
   // Verse-number prefix: prepend superscript number when multiple verses are shown
   const showVerseNums = countTokenVerses(validTokens) > 1;
-  const prefixed = (num, text) => showVerseNums ? `${toSuperNum(num)} ${text}` : text;
+  // Keep verse-number markers in text. Rendering layer converts them to <sup>.
+  const prefixed = (num, text) => showVerseNums ? `[[v:${num}]] ${text}` : text;
 
   setLookupStatus('Looking up…', 'loading');
 
-  // ── Tier 1: bible-api.com (free) — also handles reference-only fallback (ASV) ─
-  const freeApiTrans = isRefOnly ? 'asv' : BIBLE_API_MAP[transAbbr];
-  if (freeApiTrans) {
-    const verseParam = validTokens.map(t =>
-      t.type === 'single' ? String(t.v) : `${t.from}-${t.to}`
-    ).join(',');
-    const ref = `${book} ${chapter}:${verseParam}`;
-    const url = `https://bible-api.com/${encodeURIComponent(ref)}?translation=${freeApiTrans}`;
-    fetch(url)
-      .then(r => { if (!r.ok) throw new Error(`HTTP ${r.status}`); return r.json(); })
-      .then(data => {
-        let text;
-        if (Array.isArray(data.verses) && data.verses.length > 0) {
-          text = data.verses.map(v => prefixed(v.verse, v.text.trim())).join(' ');
-        } else if (data.text) {
-          text = data.text.trim();
-        }
-        if (!text) throw new Error('No text in response');
-        finaliseLookup(cacheKey, text, isRefOnly);
-      })
-      .catch(err => setLookupStatus(`Lookup failed: ${err.message}`, 'error'));
-    return;
-  }
+  // Provider order = primary + fallbacks.
+  // Free sources are preferred first, then premium, then ASV reference-only fallback.
+  const providers = [];
+  if (bgProxySupported) providers.push({ id: 'biblegateway', refOnly: false });
+  if (BIBLE_API_MAP[transAbbr]) providers.push({ id: 'bible-api', refOnly: false });
+  if (HELLOAO_MAP[transAbbr]) providers.push({ id: 'helloao', refOnly: false });
+  if (APIBIBLE_IDS[transAbbr]) providers.push({ id: 'api.bible', refOnly: false });
+  if (isRefOnly || providers.length === 0) providers.push({ id: 'reference-asv', refOnly: true });
 
-  // ── Tier 2: rest.api.bible (API key) — one chapter fetch, then filter verses ─
-  // Fetches the full chapter JSON once and caches the verse map, eliminating
-  // multiple requests for discontinuous verse selections.
-  const apiBibleId = APIBIBLE_IDS[transAbbr];
-  if (apiBibleId) {
-    const usfmBook = USFM_CODES[book];
-    if (!usfmBook) {
-      setLookupStatus('Book not recognised for API lookup.', 'error');
-      return;
-    }
-
-    const chapCacheKey = `${transAbbr}|${book}|${chapter}`;
-
-    function applyVerseMap(verseMap) {
-      const parts = [];
-      for (const tok of validTokens) {
-        if (tok.type === 'single') {
-          if (verseMap[tok.v]) parts.push(prefixed(tok.v, verseMap[tok.v]));
-        } else {
-          for (let i = tok.from; i <= tok.to; i++) {
-            if (verseMap[i]) parts.push(prefixed(i, verseMap[i]));
-          }
-        }
+  let lastError = null;
+  for (const p of providers) {
+    try {
+      let text = '';
+      if (p.id === 'biblegateway') text = await fetchBibleGatewayText(book, chapter, validTokens, transAbbr, prefixed);
+      if (p.id === 'bible-api') text = await fetchBibleApiText(book, chapter, validTokens, transAbbr, prefixed, false);
+      if (p.id === 'helloao') text = await fetchHelloAoText(book, chapter, validTokens, transAbbr, prefixed);
+      if (p.id === 'api.bible') text = await fetchApiBibleText(book, chapter, validTokens, transAbbr, prefixed);
+      if (p.id === 'reference-asv') text = await fetchBibleApiText(book, chapter, validTokens, transAbbr, prefixed, true);
+      if (text) {
+        finaliseLookup(cacheKey, text, p.refOnly);
+        return;
       }
-      const text = parts.join(' ');
-      if (!text) throw new Error('Verses not found in chapter data');
-      finaliseLookup(cacheKey, text);
+    } catch (err) {
+      lastError = err;
     }
-
-    if (apiBibleChapterCache[chapCacheKey]) {
-      try { applyVerseMap(apiBibleChapterCache[chapCacheKey]); }
-      catch (e) { setLookupStatus(e.message, 'error'); }
-      return;
-    }
-
-    const chapUrl = `${APIBIBLE_BASE}/bibles/${apiBibleId}/chapters/${usfmBook}.${chapter}` +
-      `?content-type=json&include-notes=false&include-titles=false` +
-      `&include-chapter-numbers=false&include-verse-numbers=false`;
-    fetch(chapUrl, { headers: { 'api-key': APIBIBLE_KEY } })
-      .then(r => { if (!r.ok) throw new Error(`HTTP ${r.status}`); return r.json(); })
-      .then(data => {
-        const verseMap = extractApiVerseMap(data?.data?.content || []);
-        pruneCacheIfNeeded(apiBibleChapterCache, MAX_CHAPTER_CACHE);
-        apiBibleChapterCache[chapCacheKey] = verseMap;
-        applyVerseMap(verseMap);
-      })
-      .catch(err => setLookupStatus(`Lookup failed: ${err.message}`, 'error'));
-    return;
   }
 
-  // ── Tier 3: bible.helloao.org (free, no key, chapter-level fetch) ────────
-  // Returns a full chapter; filter to requested verses and prepend verse numbers.
-  const helloaoId = HELLOAO_MAP[transAbbr];
-  if (helloaoId) {
-    const usfmBook = USFM_CODES[book];
-    if (!usfmBook) {
-      setLookupStatus('Book not recognised for API lookup.', 'error');
-      return;
-    }
-
-    const url = `${HELLOAO_BASE}/${helloaoId}/${usfmBook}/${chapter}.json`;
-    fetch(url)
-      .then(r => { if (!r.ok) throw new Error(`HTTP ${r.status}`); return r.json(); })
-      .then(data => {
-        const verses = (data?.chapter?.content || []).filter(c => c.type === 'verse');
-        const verseMap = {};
-        for (const v of verses) {
-          const text = v.content.filter(c => typeof c === 'string').join('').trim();
-          if (text) verseMap[v.number] = text;
-        }
-        const parts = [];
-        for (const tok of validTokens) {
-          if (tok.type === 'single') {
-            if (verseMap[tok.v]) parts.push(prefixed(tok.v, verseMap[tok.v]));
-          } else {
-            for (let i = tok.from; i <= tok.to; i++) {
-              if (verseMap[i]) parts.push(prefixed(i, verseMap[i]));
-            }
-          }
-        }
-        const text = parts.join(' ');
-        if (!text) throw new Error('No text in response');
-        finaliseLookup(cacheKey, text);
-      })
-      .catch(err => setLookupStatus(`Lookup failed: ${err.message}`, 'error'));
-    return;
-  }
-
-  // Should not reach here — isRefOnly handles all unsupported translations above
-  setLookupStatus('Translation not available for lookup.', 'error');
+  setLookupStatus(`Lookup failed: ${lastError?.message || 'No provider succeeded'}`, 'error');
 }
 
 function finaliseLookup(cacheKey, rawText, refOnly = false) {
@@ -585,8 +633,17 @@ function displayVerseText(text, refOnly = false) {
   if (!box || !content) return;
   box.style.display   = '';
   content.textContent = text;
-  // Reference-only: disable "use as line 2" — text is for verification, not output
-  if (chk) { chk.checked = false; chk.disabled = refOnly; }
+  // Reference-only: disable "use as line 2" — text is for verification, not output.
+  // When real verse text exists, auto-enable line2 usage for immediate output.
+  if (chk) {
+    if (refOnly) {
+      chk.checked = false;
+      chk.disabled = true;
+    } else {
+      chk.disabled = false;
+      chk.checked = true;
+    }
+  }
   if (note) note.style.display = refOnly ? '' : 'none';
   updatePreview();
 }
@@ -679,6 +736,23 @@ function buildOverlayData() {
   }
 }
 
+function formatLine2Html(text) {
+  if (!text) return '';
+  const safe = escapeHtml(text);
+  return safe.replace(/\[\[v:(\d+)\]\]\s*/g, '<sup class="verse-num">$1</sup>');
+}
+
+function setPreviewLine2(el, text) {
+  if (!el) return;
+  if (!text) {
+    el.textContent = '';
+    el.style.display = 'none';
+    return;
+  }
+  el.innerHTML = formatLine2Html(text);
+  el.style.display = '';
+}
+
 // ── Preview helpers ───────────────────────────────────────────────────────────
 function escapeHtml(str) {
   return String(str)
@@ -691,7 +765,7 @@ function substitutePreviewVars(str, s, data) {
     .replace(/\{\{line1\}\}/g,       data?.line1 ? escapeHtml(data.line1) : '')
     .replace(/\{\{line2\}\}/g,       data?.line2 ? escapeHtml(data.line2) : '')
     .replace(/\{\{accentColor\}\}/g, s.accentColor || '#C8A951')
-    .replace(/\{\{font\}\}/g,        s.font        || 'system-ui')
+    .replace(/\{\{font\}\}/g,        s.font        || "'Cinzel', serif")
     .replace(/\{\{logoUrl\}\}/g,     s.logoDataUrl  || '')
     .replace(/\{\{bgUrl\}\}/g,       s.ltBgImage    || '');
 }
@@ -754,8 +828,7 @@ function updatePreview() {
   if (staleStyle) staleStyle.textContent = '';
 
   document.getElementById('preview-line1').textContent   = data.line1;
-  document.getElementById('preview-line2').textContent   = data.line2;
-  document.getElementById('preview-line2').style.display = data.line2 ? '' : 'none';
+  setPreviewLine2(document.getElementById('preview-line2'), data.line2);
 
   const lt = document.getElementById('preview-lower-third');
   lt.className = 'lower-third';
@@ -802,7 +875,7 @@ function updatePreview() {
   const ltText = lt.querySelector('.lt-text');
   if (ltText) {
     ltText.style.fontFamily = settings.font;
-    ltText.style.textAlign  = settings.textAlign || 'center';
+    ltText.style.textAlign  = settings.textAlign || 'left';
   }
 }
 
@@ -811,6 +884,7 @@ function updatePreview() {
 // all sessions on the same browser. Use Export / Import to move between devices.
 const PRESET_KEY_OVERLAY = 'overlayPresets';
 const PRESET_KEY_TICKER  = 'tickerPresets';
+const PRESET_KEY_TEMPLATE = 'templatePresets';
 
 function loadPresets() {
   try {
@@ -819,7 +893,11 @@ function loadPresets() {
   try {
     tickerPresets  = JSON.parse(localStorage.getItem(PRESET_KEY_TICKER)  || '[]');
   } catch (_) { tickerPresets  = []; }
+  try {
+    templatePresets = JSON.parse(localStorage.getItem(PRESET_KEY_TEMPLATE) || '[]');
+  } catch (_) { templatePresets = []; }
   renderPresets();
+  renderTemplatePresets();
 }
 
 function saveCurrentPreset() {
@@ -921,11 +999,12 @@ function deletePreset(id) {
 function savePresetsToStorage() {
   try { localStorage.setItem(PRESET_KEY_OVERLAY, JSON.stringify(overlayPresets)); } catch (_) {}
   try { localStorage.setItem(PRESET_KEY_TICKER,  JSON.stringify(tickerPresets));  } catch (_) {}
+  try { localStorage.setItem(PRESET_KEY_TEMPLATE, JSON.stringify(templatePresets)); } catch (_) {}
 }
 
 // ── Preset Export / Import ─────────────────────────────────────────────────────
 function exportPresets() {
-  const payload = JSON.stringify({ overlayPresets, tickerPresets }, null, 2);
+  const payload = JSON.stringify({ overlayPresets, tickerPresets, templatePresets }, null, 2);
   const blob    = new Blob([payload], { type: 'application/json' });
   const url     = URL.createObjectURL(blob);
   const a       = document.createElement('a');
@@ -953,11 +1032,14 @@ function importPresets() {
         };
         if (Array.isArray(data.overlayPresets)) mergeIn(overlayPresets, data.overlayPresets);
         if (Array.isArray(data.tickerPresets))  mergeIn(tickerPresets,  data.tickerPresets);
+        if (Array.isArray(data.templatePresets)) mergeIn(templatePresets, data.templatePresets);
         savePresetsToStorage();
         renderPresets();
+        renderTemplatePresets();
         const countO = Array.isArray(data.overlayPresets) ? data.overlayPresets.length : 0;
         const countT = Array.isArray(data.tickerPresets)  ? data.tickerPresets.length  : 0;
-        alert(`Imported ${countO} overlay preset(s) and ${countT} ticker preset(s).`);
+        const countTpl = Array.isArray(data.templatePresets) ? data.templatePresets.length : 0;
+        alert(`Imported ${countO} overlay preset(s), ${countT} ticker preset(s), and ${countTpl} template preset(s).`);
       } catch (_) {
         alert('Import failed — file does not appear to be a valid presets export.');
       }
@@ -1110,17 +1192,16 @@ function updateProgramMonitor() {
 
     if (pgmLine1) pgmLine1.textContent = programOverlayData.line1 || '';
     if (pgmLine2) {
-      pgmLine2.textContent   = programOverlayData.line2 || '';
-      pgmLine2.style.display = programOverlayData.line2 ? '' : 'none';
+      setPreviewLine2(pgmLine2, programOverlayData.line2 || '');
     }
 
     const s = programOverlaySettings;
     if (s) {
-      if (pgmLt)     pgmLt.className            = 'lower-third style-' + (s.style || 'classic');
+      if (pgmLt)     pgmLt.className            = 'lower-third style-' + (s.style || 'gradient');
       if (pgmAccent) pgmAccent.style.background  = s.accentColor || '#C8A951';
       if (pgmLtText) {
-        pgmLtText.style.fontFamily = s.font      || 'system-ui';
-        pgmLtText.style.textAlign  = s.textAlign || 'center';
+        pgmLtText.style.fontFamily = s.font      || "'Cinzel', serif";
+        pgmLtText.style.textAlign  = s.textAlign || 'left';
       }
       if (pgmLogo) {
         if (s.logoDataUrl) { pgmLogo.src = s.logoDataUrl; pgmLogo.classList.remove('hidden'); }
@@ -1303,12 +1384,12 @@ function getSettings() {
   return {
     chroma:        chromaValue,
     animation:     document.getElementById('anim-select')?.value      || 'fade',
-    style:         document.getElementById('style-select')?.value     || 'classic',
+    style:         document.getElementById('style-select')?.value     || 'gradient',
     accentColor:   document.getElementById('accent-color')?.value     || '#C8A951',
     position:      document.getElementById('position-select')?.value  || 'lower',
-    font:          document.getElementById('font-select')?.value      || 'system-ui',
+    font:          document.getElementById('font-select')?.value      || "'Cinzel', serif",
     outputRes:     document.getElementById('output-res')?.value       || '1920x1080',
-    textAlign:     alignRadio ? alignRadio.value                      : 'center',
+    textAlign:     alignRadio ? alignRadio.value                      : 'left',
     ltBgImage:     ltBgDataUrl,
     ltBgSize:      document.getElementById('lt-bg-size')?.value       || 'cover',
     ltBgPosition:  document.getElementById('lt-bg-position')?.value   || 'center center',
@@ -1345,6 +1426,10 @@ function persistSettings(settings) {
   try {
     const small = { ...settings, ltBgImage: null, logoDataUrl: null };
     localStorage.setItem('overlaySettings-' + SESSION_ID, JSON.stringify(small));
+    // Keep custom template global so it survives new sessions/tabs.
+    if (settings.customTemplate && (settings.customTemplate.html || settings.customTemplate.css)) {
+      localStorage.setItem(GLOBAL_TEMPLATE_KEY, JSON.stringify(settings.customTemplate));
+    }
     if (settings.ltBgImage)   localStorage.setItem('overlayLtBg-'  + SESSION_ID, settings.ltBgImage);
     if (settings.logoDataUrl) localStorage.setItem('overlayLogo-'  + SESSION_ID, settings.logoDataUrl);
   } catch (_) {}
@@ -1353,6 +1438,7 @@ function persistSettings(settings) {
 function loadSettings() {
   try {
     const saved = JSON.parse(localStorage.getItem('overlaySettings-' + SESSION_ID) || '{}');
+    const globalTemplate = JSON.parse(localStorage.getItem(GLOBAL_TEMPLATE_KEY) || 'null');
 
     if (saved.chroma) {
       const standardRadio = document.querySelector(`input[name="chroma"][value="${saved.chroma}"]`);
@@ -1389,13 +1475,14 @@ function loadSettings() {
     }
 
     // Restore custom template
-    if (saved.customTemplate) {
+    const templateToRestore = saved.customTemplate || globalTemplate;
+    if (templateToRestore) {
       const enableEl = document.getElementById('use-custom-template');
       const htmlEl   = document.getElementById('template-html');
       const cssEl    = document.getElementById('template-css');
-      if (enableEl && saved.customTemplate.enabled !== undefined) enableEl.checked = saved.customTemplate.enabled;
-      if (htmlEl   && saved.customTemplate.html    !== undefined) htmlEl.value    = saved.customTemplate.html;
-      if (cssEl    && saved.customTemplate.css     !== undefined) cssEl.value     = saved.customTemplate.css;
+      if (enableEl && templateToRestore.enabled !== undefined) enableEl.checked = templateToRestore.enabled;
+      if (htmlEl   && templateToRestore.html    !== undefined) htmlEl.value    = templateToRestore.html;
+      if (cssEl    && templateToRestore.css     !== undefined) cssEl.value     = templateToRestore.css;
     }
 
     // Restore watermark toggle
@@ -1595,6 +1682,79 @@ function loadTemplate(name) {
 
 // Keep old name as alias so any saved references still work
 function resetTemplate() { loadTemplate('classic'); }
+
+function renderTemplatePresets() {
+  const sel = document.getElementById('template-preset-select');
+  if (!sel) return;
+  sel.innerHTML = '';
+
+  if (!templatePresets.length) {
+    const empty = document.createElement('option');
+    empty.value = '';
+    empty.textContent = 'No template presets yet';
+    sel.appendChild(empty);
+    return;
+  }
+
+  const placeholder = document.createElement('option');
+  placeholder.value = '';
+  placeholder.textContent = 'Select template preset...';
+  sel.appendChild(placeholder);
+
+  templatePresets.forEach(p => {
+    const opt = document.createElement('option');
+    opt.value = p.id;
+    opt.textContent = p.label;
+    sel.appendChild(opt);
+  });
+}
+
+function saveTemplatePreset() {
+  const html = document.getElementById('template-html')?.value || '';
+  const css  = document.getElementById('template-css')?.value || '';
+  const enabled = !!document.getElementById('use-custom-template')?.checked;
+  if (!html.trim() && !css.trim()) {
+    alert('Template is empty. Add HTML or CSS before saving.');
+    return;
+  }
+
+  const label = prompt('Template preset name:', 'Custom Template');
+  if (label === null || !label.trim()) return;
+
+  templatePresets.push({
+    id: Date.now().toString(36) + Math.random().toString(36).slice(2, 5),
+    label: label.trim(),
+    template: { html, css, enabled },
+  });
+
+  savePresetsToStorage();
+  renderTemplatePresets();
+  onSettingsChange();
+}
+
+function loadSelectedTemplatePreset() {
+  const id = document.getElementById('template-preset-select')?.value;
+  if (!id) return;
+  const preset = templatePresets.find(p => p.id === id);
+  if (!preset || !preset.template) return;
+
+  const enableEl = document.getElementById('use-custom-template');
+  const htmlEl   = document.getElementById('template-html');
+  const cssEl    = document.getElementById('template-css');
+  if (enableEl) enableEl.checked = !!preset.template.enabled;
+  if (htmlEl)   htmlEl.value = preset.template.html || '';
+  if (cssEl)    cssEl.value  = preset.template.css || '';
+  onSettingsChange();
+}
+
+function deleteSelectedTemplatePreset() {
+  const sel = document.getElementById('template-preset-select');
+  const id = sel?.value;
+  if (!id) return;
+  templatePresets = templatePresets.filter(p => p.id !== id);
+  savePresetsToStorage();
+  renderTemplatePresets();
+}
 
 // ── Lower Third Background Image ──────────────────────────────────────────────
 function onLtBgChange() {

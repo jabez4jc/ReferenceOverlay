@@ -141,41 +141,52 @@ const BIBLE_BOOKS = [
 ];
 
 const TRANSLATIONS = [
-  // ── Common Modern ──────────────────────────────────────────────────────────
-  { abbr: 'NIV',    name: 'New International Version' },
-  { abbr: 'ESV',    name: 'English Standard Version' },
-  { abbr: 'NLT',    name: 'New Living Translation' },
-  { abbr: 'NASB',   name: 'New American Standard Bible' },
-  { abbr: 'NASB95', name: 'NASB 1995' },
-  { abbr: 'CSB',    name: 'Christian Standard Bible' },
-  { abbr: 'NET',    name: 'New English Translation' },
-  { abbr: 'GW',     name: "GOD'S WORD Translation" },
-  { abbr: 'CEV',    name: 'Contemporary English Version' },
-  { abbr: 'GNT',    name: 'Good News Translation' },
-  { abbr: 'ERV',    name: 'Easy-to-Read Version' },
-  { abbr: 'NCV',    name: 'New Century Version' },
-  { abbr: 'MEV',    name: 'Modern English Version' },
-  { abbr: 'BSB',    name: 'Berean Standard Bible' },
-  // ── Classic ────────────────────────────────────────────────────────────────
-  { abbr: 'KJV',    name: 'King James Version' },
-  { abbr: 'NKJV',   name: 'New King James Version' },
-  { abbr: 'NRSV',   name: 'New Revised Standard Version' },
-  { abbr: 'RSV',    name: 'Revised Standard Version' },
-  { abbr: 'ASV',    name: 'American Standard Version' },
-  { abbr: 'YLT',    name: "Young's Literal Translation" },
-  // ── Amplified / Paraphrase ─────────────────────────────────────────────────
-  { abbr: 'AMP',    name: 'Amplified Bible' },
-  { abbr: 'AMPC',   name: 'Amplified Bible, Classic Edition' },
-  { abbr: 'MSG',    name: 'The Message' },
-  { abbr: 'TLB',    name: 'The Living Bible' },
-  { abbr: 'TPT',    name: 'The Passion Translation' },
-  // ── Study / Specialty ──────────────────────────────────────────────────────
-  { abbr: 'HCSB',   name: 'Holman Christian Standard Bible' },
-  { abbr: 'ICB',    name: "International Children's Bible" },
-  { abbr: 'WEB',    name: 'World English Bible' },
-  { abbr: 'NIV84',  name: 'New International Version (1984)' },
-  // ── Available via api.bible ────────────────────────────────────────────────
-  { abbr: 'LSV',    name: 'Literal Standard Version' },
+  // ── Major BibleGateway-supported English translations ─────────────────────
+  { abbr: 'NIV',      name: 'New International Version', bg: true },
+  { abbr: 'NIVUK',    name: 'New International Version (UK)', bg: true },
+  { abbr: 'NLT',      name: 'New Living Translation', bg: true },
+  { abbr: 'ESV',      name: 'English Standard Version', bg: true },
+  { abbr: 'ESVUK',    name: 'English Standard Version Anglicised', bg: true },
+  { abbr: 'KJV',      name: 'King James Version', bg: true },
+  { abbr: 'NKJV',     name: 'New King James Version', bg: true },
+  { abbr: 'NASB',     name: 'New American Standard Bible', bg: true },
+  { abbr: 'NASB95',   name: 'NASB 1995', bg: true },
+  { abbr: 'LSB',      name: 'Legacy Standard Bible', bg: true },
+  { abbr: 'CSB',      name: 'Christian Standard Bible', bg: true },
+  { abbr: 'HCSB',     name: 'Holman Christian Standard Bible', bg: true },
+  { abbr: 'NET',      name: 'New English Translation', bg: true },
+  { abbr: 'CEB',      name: 'Common English Bible', bg: true },
+  { abbr: 'NRSVUE',   name: 'New Revised Standard Version, Updated Edition', bg: true },
+  { abbr: 'NRSVA',    name: 'New Revised Standard Version', bg: true },
+  { abbr: 'NRSVCE',   name: 'New Revised Standard Version Catholic Edition', bg: true },
+  { abbr: 'RSV',      name: 'Revised Standard Version', bg: true },
+  { abbr: 'RSVCE',    name: 'Revised Standard Version Catholic Edition', bg: true },
+  { abbr: 'AMP',      name: 'Amplified Bible', bg: true },
+  { abbr: 'AMPC',     name: 'Amplified Bible, Classic Edition', bg: true },
+  { abbr: 'MSG',      name: 'The Message', bg: true },
+  { abbr: 'TLB',      name: 'The Living Bible', bg: true },
+  { abbr: 'VOICE',    name: 'The Voice', bg: true },
+  { abbr: 'ISV',      name: 'International Standard Version', bg: true },
+  { abbr: 'MEV',      name: 'Modern English Version', bg: true },
+  { abbr: 'ICB',      name: "International Children's Bible", bg: true },
+  { abbr: 'NIRV',     name: 'New International Reader’s Version', bg: true },
+  { abbr: 'NCV',      name: 'New Century Version', bg: true },
+  { abbr: 'CEV',      name: 'Contemporary English Version', bg: true },
+  { abbr: 'GNT',      name: 'Good News Translation', bg: true },
+  { abbr: 'GW',       name: "GOD'S WORD Translation", bg: true },
+  { abbr: 'ASV',      name: 'American Standard Version', bg: true },
+  { abbr: 'YLT',      name: "Young's Literal Translation", bg: true },
+  { abbr: 'DARBY',    name: 'Darby Translation', bg: true },
+  { abbr: 'WEB',      name: 'World English Bible', bg: true },
+  { abbr: 'NABRE',    name: 'New American Bible, Revised Edition', bg: true },
+  { abbr: 'BSB',      name: 'Berean Standard Bible', bg: false }, // from helloao free source
+
+  // ── Available in current premium API integration (and maybe free elsewhere) ─
+  { abbr: 'LSV',      name: 'Literal Standard Version', bg: false },
+
+  // ── Legacy aliases retained for compatibility with existing presets ───────
+  { abbr: 'NRSV',     name: 'New Revised Standard Version (legacy alias)', bg: true },
+  { abbr: 'NIV84',    name: 'New International Version (1984)', bg: false },
 ];
 
 // ── bible-api.com  (free, no key, public-domain translations) ─────────────────
@@ -187,6 +198,49 @@ const BIBLE_API_MAP = {
   'YLT':   'ylt',
   'DARBY': 'darby',
   'BBE':   'bbe',
+};
+
+// ── BibleGateway version code mapping ────────────────────────────────────────
+// Translation abbreviations in our UI mapped to BibleGateway version codes.
+const BIBLEGATEWAY_MAP = {
+  'NIV': 'NIV',
+  'NIVUK': 'NIVUK',
+  'NLT': 'NLT',
+  'ESV': 'ESV',
+  'ESVUK': 'ESVUK',
+  'KJV': 'KJV',
+  'NKJV': 'NKJV',
+  'NASB': 'NASB',
+  'NASB95': 'NASB1995',
+  'LSB': 'LSB',
+  'CSB': 'CSB',
+  'HCSB': 'HCSB',
+  'NET': 'NET',
+  'CEB': 'CEB',
+  'NRSVUE': 'NRSVUE',
+  'NRSVA': 'NRSVA',
+  'NRSVCE': 'NRSVCE',
+  'NRSV': 'NRSVA',
+  'RSV': 'RSV',
+  'RSVCE': 'RSVCE',
+  'AMP': 'AMP',
+  'AMPC': 'AMPC',
+  'MSG': 'MSG',
+  'TLB': 'TLB',
+  'VOICE': 'VOICE',
+  'ISV': 'ISV',
+  'MEV': 'MEV',
+  'ICB': 'ICB',
+  'NIRV': 'NIRV',
+  'NCV': 'NCV',
+  'CEV': 'CEV',
+  'GNT': 'GNT',
+  'GW': 'GW',
+  'ASV': 'ASV',
+  'YLT': 'YLT',
+  'DARBY': 'DARBY',
+  'WEB': 'WEB',
+  'NABRE': 'NABRE',
 };
 
 // ── api.bible  (https://rest.api.bible — requires API key) ────────────────────

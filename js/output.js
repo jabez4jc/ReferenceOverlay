@@ -111,8 +111,7 @@ function showOverlay(data) {
     ltCustomWrap.classList.add('visible');
   } else {
     ltLine1.textContent   = data.line1 || '';
-    ltLine2.textContent   = data.line2 || '';
-    ltLine2.style.display = data.line2 ? '' : 'none';
+    setOutputLine2(data.line2 || '');
     ltRoot.classList.remove('visible');
     void ltRoot.offsetWidth;
     ltRoot.classList.add('visible');
@@ -127,6 +126,23 @@ function hideOverlay() {
   ltRoot.classList.remove('visible');
   if (ltCustomWrap) ltCustomWrap.classList.remove('visible');
   try { sessionStorage.removeItem('overlayLive'); } catch (_) {}
+}
+
+function formatLine2Html(text) {
+  if (!text) return '';
+  const safe = escapeHtml(text);
+  return safe.replace(/\[\[v:(\d+)\]\]\s*/g, '<sup class="verse-num">$1</sup>');
+}
+
+function setOutputLine2(text) {
+  if (!ltLine2) return;
+  if (!text) {
+    ltLine2.textContent = '';
+    ltLine2.style.display = 'none';
+    return;
+  }
+  ltLine2.innerHTML = formatLine2Html(text);
+  ltLine2.style.display = '';
 }
 
 // ── Ticker Show / Hide ────────────────────────────────────────────────────────
@@ -205,8 +221,9 @@ function applySettings(s) {
 
   // ── Lower third style ──────────────────────────────────────────────────────
   ltRoot.classList.remove('style-classic', 'style-accent', 'style-minimal', 'style-outline',
-                          'style-gradient', 'style-solid', 'style-split', 'style-frosted');
-  ltRoot.classList.add('style-' + (s.style || 'classic'));
+                          'style-gradient', 'style-scripture', 'style-scripture-panel',
+                          'style-solid', 'style-split', 'style-frosted');
+  ltRoot.classList.add('style-' + (s.style || 'gradient'));
 
   // ── Accent colour ─────────────────────────────────────────────────────────
   if (s.accentColor && ltAccent) {
@@ -234,8 +251,8 @@ function applySettings(s) {
   // ── Text alignment ────────────────────────────────────────────────────────
   if (ltText) {
     ltText.classList.remove('align-left', 'align-center', 'align-right');
-    ltText.classList.add('align-' + (s.textAlign || 'center'));
-    ltText.style.textAlign = s.textAlign || 'center';
+    ltText.classList.add('align-' + (s.textAlign || 'left'));
+    ltText.style.textAlign = s.textAlign || 'left';
   }
 
   // ── Lower third background image ──────────────────────────────────────────
@@ -305,7 +322,7 @@ function substituteVars(str, s, data) {
     .replace(/\{\{line1\}\}/g,       (data && data.line1)  ? escapeHtml(data.line1)  : '')
     .replace(/\{\{line2\}\}/g,       (data && data.line2)  ? escapeHtml(data.line2)  : '')
     .replace(/\{\{accentColor\}\}/g, s.accentColor  || '#C8A951')
-    .replace(/\{\{font\}\}/g,        s.font          || 'system-ui')
+    .replace(/\{\{font\}\}/g,        s.font          || "'Cinzel', serif")
     .replace(/\{\{logoUrl\}\}/g,     s.logoDataUrl   || '')
     .replace(/\{\{bgUrl\}\}/g,       s.ltBgImage     || '');
 }

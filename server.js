@@ -22,6 +22,8 @@ const http = require('http');
 const fs   = require('fs');
 const path = require('path');
 const os   = require('os');
+const axios = require('axios');
+const cheerio = require('cheerio');
 
 const PORT = parseInt(process.env.PORT, 10) || 3333;
 const ROOT = __dirname;
@@ -42,9 +44,50 @@ const MIME = {
 };
 
 // ── HTTP Server ───────────────────────────────────────────────────────────────
-const server = http.createServer((req, res) => {
+const server = http.createServer(async (req, res) => {
+  const reqUrl = new URL(req.url || '/', `http://${req.headers.host || 'localhost'}`);
+
+  // BibleGateway verse proxy endpoint (used by control.js lookup)
+  if (req.method === 'GET' && reqUrl.pathname === '/api/verse') {
+    const book    = (reqUrl.searchParams.get('book') || '').trim();
+    const chapter = (reqUrl.searchParams.get('chapter') || '').trim();
+    const verses  = (reqUrl.searchParams.get('verses') || '').trim();
+    const version = (reqUrl.searchParams.get('version') || 'KJV').trim().toUpperCase();
+
+    if (!book || !chapter || !verses) {
+      res.writeHead(400, { 'Content-Type': 'application/json; charset=utf-8' });
+      res.end(JSON.stringify({ code: 400, message: 'Missing required params: book, chapter, verses' }));
+      return;
+    }
+
+    // Guard against garbage input before forwarding to BibleGateway
+    if (!/^[0-9]+(?:[-,][0-9]+)*$/.test(verses)) {
+      res.writeHead(400, { 'Content-Type': 'application/json; charset=utf-8' });
+      res.end(JSON.stringify({ code: 400, message: 'Invalid verse reference format' }));
+      return;
+    }
+
+    try {
+      const result = await getBibleGatewayVerse(book, `${chapter}:${verses}`, version);
+      res.writeHead(200, {
+        'Content-Type': 'application/json; charset=utf-8',
+        'Cache-Control': 'no-cache',
+      });
+      res.end(JSON.stringify(result));
+      return;
+    } catch (err) {
+      res.writeHead(502, { 'Content-Type': 'application/json; charset=utf-8' });
+      res.end(JSON.stringify({
+        code: 502,
+        message: 'Verse lookup failed',
+        detail: err && err.message ? err.message : 'Unknown error',
+      }));
+      return;
+    }
+  }
+
   // Strip query string, resolve relative paths, prevent directory traversal
-  const rawPath  = req.url.split('?')[0];
+  const rawPath  = reqUrl.pathname;
   const safePath = path.normalize(rawPath).replace(/^(\.\.(\/|\\|$))+/, '');
   const filePath = path.join(ROOT, safePath === '/' || safePath === '' ? 'index.html' : safePath);
 
@@ -68,6 +111,37 @@ const server = http.createServer((req, res) => {
     res.end(data);
   });
 });
+
+async function getBibleGatewayVerse(book, passage, version = 'KJV') {
+  // Mirrors Glowstudent777/BibleGateway-API-NPM getVerse() logic.
+  const url = `https://www.biblegateway.com/passage/?search=${encodeURIComponent(book + ' ' + passage)}&version=${encodeURIComponent(version)}`;
+  const response = await axios.get(url, {
+    timeout: 15000,
+    headers: {
+      // Browser-like UA reduces anti-bot false positives.
+      'User-Agent': 'Mozilla/5.0 (compatible; Overlay/2.0; +https://github.com/jabez4jc/Overlay)',
+    },
+  });
+  const $ = cheerio.load(response.data);
+
+  const passageContent = $('meta[property="og:description"]').attr('content');
+  if (!passageContent) {
+    throw new Error(`Could not find passage ${book} ${passage} ${version}`);
+  }
+
+  let footnotes = '';
+  $('.footnotes li').each((_, elem) => {
+    footnotes += $(elem).text().trim() + ' ';
+  });
+  footnotes = footnotes.trim();
+
+  const payload = {
+    citation: `${book} ${passage} ${version}`,
+    passage: passageContent.trim(),
+  };
+  if (footnotes) payload.footnotes = footnotes;
+  return payload;
+}
 
 // ── WebSocket Server ──────────────────────────────────────────────────────────
 let WebSocketServer;
