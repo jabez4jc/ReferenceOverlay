@@ -337,13 +337,15 @@ function formatVerseRef(raw, maxVerse) {
 }
 
 // ── Bible API — Verse Text Lookup ─────────────────────────────────────────────
-// Two-tier lookup:
-//   Tier 1: bible-api.com (free, no key) — KJV, ASV, WEB, YLT, DARBY, BBE
-//   Tier 2: rest.api.bible (API key)     — AMP, MSG, NASB, NASB95, LSV + more
-// See data.js for BIBLE_API_MAP, APIBIBLE_IDS, and USFM_CODES.
+// Three-tier lookup:
+//   Tier 1: bible-api.com (free, no key)      — KJV, ASV, WEB, YLT, DARBY, BBE
+//   Tier 2: rest.api.bible (API key)           — AMP, MSG, NASB, NASB95, LSV + more
+//   Tier 3: bible.helloao.org (free, no key)   — BSB
+// See data.js for BIBLE_API_MAP, APIBIBLE_IDS, HELLOAO_MAP, and USFM_CODES.
 
 const APIBIBLE_BASE = 'https://rest.api.bible/v1';
 const APIBIBLE_KEY  = '8LWqzQ47HMAtKGhfXVY2K';
+const HELLOAO_BASE  = 'https://bible.helloao.org/api';
 
 function lookupVerse() {
   const book      = document.getElementById('book').value;
@@ -445,9 +447,53 @@ function lookupVerse() {
     return;
   }
 
+  // ── Tier 3: bible.helloao.org (free, no key, chapter-level fetch) ────────
+  // The API returns a full chapter; we filter to the requested verse numbers.
+  // Content items are either plain strings or {noteId} footnote refs (skipped).
+  const helloaoId = HELLOAO_MAP[transAbbr];
+  if (helloaoId) {
+    const usfmBook = USFM_CODES[book];
+    if (!usfmBook) {
+      setLookupStatus('Book not recognised for API lookup.', 'error');
+      return;
+    }
+
+    const url = `${HELLOAO_BASE}/${helloaoId}/${usfmBook}/${chapter}.json`;
+    fetch(url)
+      .then(r => { if (!r.ok) throw new Error(`HTTP ${r.status}`); return r.json(); })
+      .then(data => {
+        const verses = (data?.chapter?.content || []).filter(c => c.type === 'verse');
+
+        // Build verse-number → text map, skipping inline footnote ref objects
+        const verseMap = {};
+        for (const v of verses) {
+          const text = v.content.filter(c => typeof c === 'string').join('').trim();
+          if (text) verseMap[v.number] = text;
+        }
+
+        // Collect requested verses in token order
+        const parts = [];
+        for (const tok of validTokens) {
+          if (tok.type === 'single') {
+            if (verseMap[tok.v]) parts.push(verseMap[tok.v]);
+          } else {
+            for (let i = tok.from; i <= tok.to; i++) {
+              if (verseMap[i]) parts.push(verseMap[i]);
+            }
+          }
+        }
+
+        const text = parts.join(' ');
+        if (!text) throw new Error('No text in response');
+        finaliseLookup(cacheKey, text);
+      })
+      .catch(err => setLookupStatus(`Lookup failed: ${err.message}`, 'error'));
+    return;
+  }
+
   // ── No API supports this translation ─────────────────────────────────────
   setLookupStatus(
-    `${transAbbr} is not available for lookup. Supported: KJV, ASV, WEB, YLT, AMP, MSG, NASB, NASB95, LSV`,
+    `${transAbbr} is not available for lookup. Supported: KJV, ASV, WEB, YLT, AMP, MSG, NASB, NASB95, LSV, BSB`,
     'error'
   );
 }

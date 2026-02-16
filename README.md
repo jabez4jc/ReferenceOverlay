@@ -333,8 +333,15 @@ the same browser. If you need OBS Browser Source, deploy Option B or C instead.
 | **Verse** | Supports single (`3`), ranges (`3–5`), and mixed (`3, 5–7, 10`) |
 | **Translation** | 40+ options. Free-tier translations show live verse text; others show reference only |
 
-Verse text is fetched live from [bible-api.com](https://bible-api.com) (public domain
-translations) or api.bible (premium translations). Results are cached for the session.
+Verse text is fetched live using a three-tier system:
+
+| Tier | Source | Translations |
+|---|---|---|
+| 1 | [bible-api.com](https://bible-api.com) (free, no key) | KJV, ASV, WEB, YLT, DARBY, BBE |
+| 2 | [api.bible](https://scripture.api.bible) (API key) | AMP, MSG, NASB, NASB95, LSV |
+| 3 | [bible.helloao.org](https://bible.helloao.org) (free, no key) | BSB |
+
+Results are cached for the session.
 
 ![Output window — Bible reference overlay on chroma key background](assets/screenshots/output-reference.png)
 
