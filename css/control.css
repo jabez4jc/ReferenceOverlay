@@ -391,13 +391,17 @@ input::placeholder { color: var(--text-dim); }
     );
 }
 
-/* Custom template preview occupies the full viewport so the template can
-   position itself freely (it uses the same coordinate space as the output). */
+/* Custom template preview is positioned like the output wrapper. */
 .preview-custom-wrap {
   position: absolute;
-  inset: 0;
+  left: 0;
+  right: 0;
+  bottom: 8%;
+  padding: 0 3%;
   overflow: hidden;
 }
+.preview-custom-wrap.pos-upper  { bottom: auto; top: 8%; }
+.preview-custom-wrap.pos-center { bottom: auto; top: 50%; transform: translateY(-50%); }
 
 .lower-third-wrap {
   position: absolute;
@@ -405,6 +409,16 @@ input::placeholder { color: var(--text-dim); }
   right: 0;
   bottom: 8%;
   padding: 0 3%;
+}
+.lower-third-wrap.pos-upper  { bottom: auto; top: 8%; }
+.lower-third-wrap.pos-center { bottom: auto; top: 50%; transform: translateY(-50%); }
+
+/* Scale a 1920x1080 custom-template stage into monitor viewport. */
+.monitor-custom-stage {
+  width: 1920px;
+  height: 1080px;
+  transform-origin: top left;
+  pointer-events: none;
 }
 
 .lower-third {
@@ -451,7 +465,7 @@ input::placeholder { color: var(--text-dim); }
 }
 
 .lt-line1 {
-  font-size: 1.15em;
+  font-size: var(--monitor-line1-size, 1.15em);
   font-weight: 700;
   color: #fff;
   white-space: nowrap;
@@ -460,12 +474,13 @@ input::placeholder { color: var(--text-dim); }
 }
 
 .lt-line2 {
-  font-size: .72em;
+  font-size: var(--monitor-line2-size, .72em);
   font-weight: 400;
   color: rgba(255,255,255,.72);
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
+  line-height: var(--monitor-line2-lh, 1.2);
 }
 
 .lt-line2 .verse-num {

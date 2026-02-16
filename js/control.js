@@ -166,7 +166,7 @@ function populateTranslations() {
   sel.appendChild(grpFree);
   sel.appendChild(grpPremium);
   sel.appendChild(grpRef);
-  sel.value = 'KJV';
+  sel.value = 'NONE';
 }
 
 function populateFonts() {
@@ -372,6 +372,10 @@ function pruneCacheIfNeeded(cache, max) {
 }
 
 // ── Verse number helpers ──────────────────────────────────────────────────────
+const _SUPER_DIGITS = ['⁰','¹','²','³','⁴','⁵','⁶','⁷','⁸','⁹'];
+function toSuperNum(n) {
+  return String(n).split('').map(d => _SUPER_DIGITS[+d]).join('');
+}
 function countTokenVerses(tokens) {
   return tokens.reduce((n, t) => n + (t.type === 'single' ? 1 : t.to - t.from + 1), 0);
 }
@@ -551,19 +555,15 @@ async function lookupVerse() {
     return;
   }
 
-  const bgProxySupported = (transAbbr !== 'NONE') && canUseBibleGatewayProxy() && !!(BIBLEGATEWAY_MAP[transAbbr] || TRANSLATIONS.find(t => t.abbr === transAbbr)?.bg);
-  const hasFreeSource    = !!(bgProxySupported || BIBLE_API_MAP[transAbbr] || HELLOAO_MAP[transAbbr]);
-  const hasPremiumSource = !!APIBIBLE_IDS[transAbbr];
-  const isSupported      = hasFreeSource || hasPremiumSource;
-  const isRefOnly        = (transAbbr === 'NONE') || !isSupported;
+  const DEFAULT_FALLBACK_ABBR = 'NASB';
+  const requestedAbbr = (transAbbr && transAbbr !== 'NONE') ? transAbbr : '';
+  const cacheTransKey = requestedAbbr || DEFAULT_FALLBACK_ABBR;
 
   // Canonical cache key. Reference-only lookups share a single ASV-sourced cache entry.
   const verseKey = validTokens.map(t =>
     t.type === 'single' ? String(t.v) : `${t.from}-${t.to}`
   ).join(',');
-  const cacheKey = isRefOnly
-    ? `${book}|${chapter}|${verseKey}|_REF`
-    : `${book}|${chapter}|${verseKey}|${transAbbr}`;
+  const cacheKey = `${book}|${chapter}|${verseKey}|${cacheTransKey}`;
 
   const cached = verseTextCache[cacheKey];
   if (cached) {
@@ -573,29 +573,51 @@ async function lookupVerse() {
 
   // Verse-number prefix: prepend superscript number when multiple verses are shown
   const showVerseNums = countTokenVerses(validTokens) > 1;
-  // Keep verse-number markers in text. Rendering layer converts them to <sup>.
-  const prefixed = (num, text) => showVerseNums ? `[[v:${num}]] ${text}` : text;
+  const prefixed = (num, text) => showVerseNums ? `${toSuperNum(num)} ${text}` : text;
 
   setLookupStatus('Looking up…', 'loading');
 
   // Provider order = primary + fallbacks.
-  // Free sources are preferred first, then premium, then ASV reference-only fallback.
+  // Free sources are preferred first, then premium.
+  // If no translation is selected or selected translation fails, default fallback is NASB via BibleGateway.
   const providers = [];
-  if (bgProxySupported) providers.push({ id: 'biblegateway', refOnly: false });
-  if (BIBLE_API_MAP[transAbbr]) providers.push({ id: 'bible-api', refOnly: false });
-  if (HELLOAO_MAP[transAbbr]) providers.push({ id: 'helloao', refOnly: false });
-  if (APIBIBLE_IDS[transAbbr]) providers.push({ id: 'api.bible', refOnly: false });
-  if (isRefOnly || providers.length === 0) providers.push({ id: 'reference-asv', refOnly: true });
+  const seenProviderKeys = new Set();
+  function addProvidersForTranslation(abbr, isFallback = false) {
+    if (!abbr) return;
+    const canBg = canUseBibleGatewayProxy() && !!(BIBLEGATEWAY_MAP[abbr] || TRANSLATIONS.find(t => t.abbr === abbr)?.bg);
+    const list = [];
+    if (canBg) list.push('biblegateway');
+    if (BIBLE_API_MAP[abbr]) list.push('bible-api');
+    if (HELLOAO_MAP[abbr]) list.push('helloao');
+    if (APIBIBLE_IDS[abbr]) list.push('api.bible');
+    list.forEach(id => {
+      const key = `${id}|${abbr}`;
+      if (seenProviderKeys.has(key)) return;
+      seenProviderKeys.add(key);
+      providers.push({ id, abbr, refOnly: false, fallback: isFallback });
+    });
+  }
+
+  // Primary providers from selected translation
+  addProvidersForTranslation(requestedAbbr, false);
+
+  // Default fallback when no translation is set or selected translation has no/failed text
+  if (!requestedAbbr || requestedAbbr !== DEFAULT_FALLBACK_ABBR) {
+    addProvidersForTranslation(DEFAULT_FALLBACK_ABBR, true);
+  }
+
+  // Final reference-only fallback if no source is available at all
+  if (providers.length === 0) providers.push({ id: 'reference-asv', abbr: 'ASV', refOnly: true });
 
   let lastError = null;
   for (const p of providers) {
     try {
       let text = '';
-      if (p.id === 'biblegateway') text = await fetchBibleGatewayText(book, chapter, validTokens, transAbbr, prefixed);
-      if (p.id === 'bible-api') text = await fetchBibleApiText(book, chapter, validTokens, transAbbr, prefixed, false);
-      if (p.id === 'helloao') text = await fetchHelloAoText(book, chapter, validTokens, transAbbr, prefixed);
-      if (p.id === 'api.bible') text = await fetchApiBibleText(book, chapter, validTokens, transAbbr, prefixed);
-      if (p.id === 'reference-asv') text = await fetchBibleApiText(book, chapter, validTokens, transAbbr, prefixed, true);
+      if (p.id === 'biblegateway') text = await fetchBibleGatewayText(book, chapter, validTokens, p.abbr, prefixed);
+      if (p.id === 'bible-api') text = await fetchBibleApiText(book, chapter, validTokens, p.abbr, prefixed, false);
+      if (p.id === 'helloao') text = await fetchHelloAoText(book, chapter, validTokens, p.abbr, prefixed);
+      if (p.id === 'api.bible') text = await fetchApiBibleText(book, chapter, validTokens, p.abbr, prefixed);
+      if (p.id === 'reference-asv') text = await fetchBibleApiText(book, chapter, validTokens, p.abbr, prefixed, true);
       if (text) {
         finaliseLookup(cacheKey, text, p.refOnly);
         return;
@@ -736,23 +758,6 @@ function buildOverlayData() {
   }
 }
 
-function formatLine2Html(text) {
-  if (!text) return '';
-  const safe = escapeHtml(text);
-  return safe.replace(/\[\[v:(\d+)\]\]\s*/g, '<sup class="verse-num">$1</sup>');
-}
-
-function setPreviewLine2(el, text) {
-  if (!el) return;
-  if (!text) {
-    el.textContent = '';
-    el.style.display = 'none';
-    return;
-  }
-  el.innerHTML = formatLine2Html(text);
-  el.style.display = '';
-}
-
 // ── Preview helpers ───────────────────────────────────────────────────────────
 function escapeHtml(str) {
   return String(str)
@@ -770,6 +775,48 @@ function substitutePreviewVars(str, s, data) {
     .replace(/\{\{bgUrl\}\}/g,       s.ltBgImage    || '');
 }
 
+function applyMonitorTextFit(ltEl, viewportEl, style, line2Text) {
+  if (!ltEl || !viewportEl) return;
+  const vpWidth = viewportEl.offsetWidth || 320;
+  const scale = Math.max(0.12, Math.min(1, vpWidth / 1920));
+  const len = (line2Text || '').trim().length;
+
+  // Base sizes at output reference width (1920px), then scaled into monitor.
+  let baseLine1 = 52;
+  let baseLine2 = 34;
+  let baseLine2Lh = 1.2;
+  if (style === 'scripture') {
+    baseLine1 = 30;
+    baseLine2 = 24;
+    baseLine2Lh = 1.3;
+  } else if (style === 'scripture-panel') {
+    baseLine1 = 26;
+    baseLine2 = 22;
+    baseLine2Lh = 1.34;
+  }
+
+  // Dense passages get proportionally smaller in monitors to preserve composition.
+  let density = 1;
+  if (len > 300) density = 0.56;
+  else if (len > 220) density = 0.66;
+  else if (len > 160) density = 0.78;
+  else if (len > 120) density = 0.88;
+
+  const line2Px = Math.max(10, Math.round(baseLine2 * scale * density * 10) / 10);
+  const line1Px = Math.max(12, Math.round(baseLine1 * scale * Math.max(0.72, density + 0.08) * 10) / 10);
+  ltEl.style.setProperty('--monitor-line1-size', `${line1Px}px`);
+  ltEl.style.setProperty('--monitor-line2-size', `${line2Px}px`);
+  ltEl.style.setProperty('--monitor-line2-lh', String(baseLine2Lh));
+}
+
+function applyMonitorCustomStageScale(stageEl, viewportEl) {
+  if (!stageEl || !viewportEl) return;
+  const vw = viewportEl.clientWidth || 320;
+  const vh = viewportEl.clientHeight || 180;
+  const scale = Math.max(0.1, Math.min(vw / 1920, vh / 1080));
+  stageEl.style.transform = `scale(${scale})`;
+}
+
 // ── Preview ───────────────────────────────────────────────────────────────────
 function updatePreview() {
   const data     = buildOverlayData();
@@ -778,8 +825,10 @@ function updatePreview() {
 
   const previewWrap   = document.getElementById('preview-wrap');
   const customWrap    = document.getElementById('preview-custom-wrap');
+  const customStage   = document.getElementById('preview-custom-stage');
   const customEl      = document.getElementById('preview-custom');
   const tickerPreview = document.getElementById('preview-ticker-wrap');
+  const previewViewport = document.querySelector('.preview-viewport');
 
   // ── Ticker mode preview ─────────────────────────────────────────────────────
   if (currentMode === 'ticker') {
@@ -806,6 +855,11 @@ function updatePreview() {
     // ── Custom template preview ───────────────────────────────────────────
     if (previewWrap) previewWrap.style.display = 'none';
     if (customWrap)  customWrap.style.display  = '';
+    if (customWrap) {
+      customWrap.classList.remove('pos-lower', 'pos-upper', 'pos-center');
+      customWrap.classList.add('pos-' + (settings.position || 'lower'));
+    }
+    applyMonitorCustomStageScale(customStage, previewViewport);
     if (customEl) {
       customEl.innerHTML = substitutePreviewVars(settings.customTemplate.html, settings, data);
     }
@@ -823,16 +877,22 @@ function updatePreview() {
   // ── Standard lower-third preview ─────────────────────────────────────────
   if (previewWrap) previewWrap.style.display = '';
   if (customWrap)  customWrap.style.display  = 'none';
+  if (previewWrap) {
+    previewWrap.classList.remove('pos-lower', 'pos-upper', 'pos-center');
+    previewWrap.classList.add('pos-' + (settings.position || 'lower'));
+  }
   // Clear injected custom CSS when template is disabled
   const staleStyle = document.getElementById('preview-custom-style');
   if (staleStyle) staleStyle.textContent = '';
 
   document.getElementById('preview-line1').textContent   = data.line1;
-  setPreviewLine2(document.getElementById('preview-line2'), data.line2);
+  document.getElementById('preview-line2').textContent   = data.line2;
+  document.getElementById('preview-line2').style.display = data.line2 ? '' : 'none';
 
   const lt = document.getElementById('preview-lower-third');
   lt.className = 'lower-third';
   lt.classList.add('style-' + settings.style);
+  applyMonitorTextFit(lt, previewViewport, settings.style, data.line2 || '');
 
   if (settings.ltBgImage) {
     const bgSizeMap = { stretch: '100% 100%', contain: 'contain', cover: 'cover' };
@@ -1171,6 +1231,9 @@ function setTickerStatus(live) {
 // Renders a frozen snapshot of what is currently live into the PGM viewport.
 function updateProgramMonitor() {
   const pgmWrap        = document.getElementById('program-wrap');
+  const pgmCustomWrap  = document.getElementById('program-custom-wrap');
+  const pgmCustomStage = document.getElementById('program-custom-stage');
+  const pgmCustom      = document.getElementById('program-custom');
   const pgmLt          = document.getElementById('program-lower-third');
   const pgmLine1       = document.getElementById('program-line1');
   const pgmLine2       = document.getElementById('program-line2');
@@ -1182,34 +1245,65 @@ function updateProgramMonitor() {
   const pgmTickerBadge = document.getElementById('program-ticker-badge');
   const pgmTickerText  = document.getElementById('program-ticker-text');
   const offAir         = document.getElementById('program-off-air');
+  const pgmViewport    = document.querySelector('#monitor-program-block .monitor-viewport');
 
   const anythingLive = programOverlayLive || programTickerLive;
   if (offAir) offAir.style.display = anythingLive ? 'none' : '';
 
   // ── Overlay (lower-third or speaker) ───────────────────────────────────────
   if (programOverlayLive && programOverlayData) {
-    if (pgmWrap) pgmWrap.style.display = '';
-
-    if (pgmLine1) pgmLine1.textContent = programOverlayData.line1 || '';
-    if (pgmLine2) {
-      setPreviewLine2(pgmLine2, programOverlayData.line2 || '');
-    }
-
     const s = programOverlaySettings;
-    if (s) {
-      if (pgmLt)     pgmLt.className            = 'lower-third style-' + (s.style || 'gradient');
-      if (pgmAccent) pgmAccent.style.background  = s.accentColor || '#C8A951';
+    const useCustom = !!(s && s.customTemplate && s.customTemplate.enabled && s.customTemplate.html);
+    if (useCustom) {
+      if (pgmWrap) pgmWrap.style.display = 'none';
+      if (pgmCustomWrap) {
+        pgmCustomWrap.style.display = '';
+        pgmCustomWrap.classList.remove('pos-lower', 'pos-upper', 'pos-center');
+        pgmCustomWrap.classList.add('pos-' + (s.position || 'lower'));
+      }
+      applyMonitorCustomStageScale(pgmCustomStage, pgmViewport);
+      if (pgmCustom) {
+        pgmCustom.innerHTML = substitutePreviewVars(s.customTemplate.html, s, programOverlayData);
+      }
+      let styleEl = document.getElementById('program-custom-style');
+      if (!styleEl) {
+        styleEl = document.createElement('style');
+        styleEl.id = 'program-custom-style';
+        document.head.appendChild(styleEl);
+      }
+      styleEl.textContent = substitutePreviewVars(s.customTemplate.css || '', s, programOverlayData);
+    } else {
+      if (pgmCustomWrap) pgmCustomWrap.style.display = 'none';
+      const staleProgramStyle = document.getElementById('program-custom-style');
+      if (staleProgramStyle) staleProgramStyle.textContent = '';
+
+      if (pgmWrap) {
+        pgmWrap.style.display = '';
+        pgmWrap.classList.remove('pos-lower', 'pos-upper', 'pos-center');
+        pgmWrap.classList.add('pos-' + (s?.position || 'lower'));
+      }
+
+      if (pgmLine1) pgmLine1.textContent = programOverlayData.line1 || '';
+      if (pgmLine2) {
+        pgmLine2.textContent   = programOverlayData.line2 || '';
+        pgmLine2.style.display = programOverlayData.line2 ? '' : 'none';
+      }
+
+      if (pgmLt)     pgmLt.className            = 'lower-third style-' + (s?.style || 'gradient');
+      applyMonitorTextFit(pgmLt, pgmViewport, s?.style || 'gradient', programOverlayData.line2 || '');
+      if (pgmAccent) pgmAccent.style.background  = s?.accentColor || '#C8A951';
       if (pgmLtText) {
-        pgmLtText.style.fontFamily = s.font      || "'Cinzel', serif";
-        pgmLtText.style.textAlign  = s.textAlign || 'left';
+        pgmLtText.style.fontFamily = s?.font      || "'Cinzel', serif";
+        pgmLtText.style.textAlign  = s?.textAlign || 'left';
       }
       if (pgmLogo) {
-        if (s.logoDataUrl) { pgmLogo.src = s.logoDataUrl; pgmLogo.classList.remove('hidden'); }
+        if (s?.logoDataUrl) { pgmLogo.src = s.logoDataUrl; pgmLogo.classList.remove('hidden'); }
         else                               pgmLogo.classList.add('hidden');
       }
     }
   } else {
     if (pgmWrap) pgmWrap.style.display = 'none';
+    if (pgmCustomWrap) pgmCustomWrap.style.display = 'none';
   }
 
   // ── Ticker ─────────────────────────────────────────────────────────────────

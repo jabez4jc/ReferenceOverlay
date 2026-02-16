@@ -111,7 +111,8 @@ function showOverlay(data) {
     ltCustomWrap.classList.add('visible');
   } else {
     ltLine1.textContent   = data.line1 || '';
-    setOutputLine2(data.line2 || '');
+    ltLine2.textContent   = data.line2 || '';
+    ltLine2.style.display = data.line2 ? '' : 'none';
     ltRoot.classList.remove('visible');
     void ltRoot.offsetWidth;
     ltRoot.classList.add('visible');
@@ -126,23 +127,6 @@ function hideOverlay() {
   ltRoot.classList.remove('visible');
   if (ltCustomWrap) ltCustomWrap.classList.remove('visible');
   try { sessionStorage.removeItem('overlayLive'); } catch (_) {}
-}
-
-function formatLine2Html(text) {
-  if (!text) return '';
-  const safe = escapeHtml(text);
-  return safe.replace(/\[\[v:(\d+)\]\]\s*/g, '<sup class="verse-num">$1</sup>');
-}
-
-function setOutputLine2(text) {
-  if (!ltLine2) return;
-  if (!text) {
-    ltLine2.textContent = '';
-    ltLine2.style.display = 'none';
-    return;
-  }
-  ltLine2.innerHTML = formatLine2Html(text);
-  ltLine2.style.display = '';
 }
 
 // ── Ticker Show / Hide ────────────────────────────────────────────────────────
