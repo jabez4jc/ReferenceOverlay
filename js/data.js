@@ -155,6 +155,7 @@ const TRANSLATIONS = [
   { abbr: 'ERV',    name: 'Easy-to-Read Version' },
   { abbr: 'NCV',    name: 'New Century Version' },
   { abbr: 'MEV',    name: 'Modern English Version' },
+  { abbr: 'BSB',    name: 'Berean Standard Bible' },
   // ── Classic ────────────────────────────────────────────────────────────────
   { abbr: 'KJV',    name: 'King James Version' },
   { abbr: 'NKJV',   name: 'New King James Version' },
@@ -197,6 +198,13 @@ const APIBIBLE_IDS = {
   'NASB':   'b8ee27bcd1cae43a-01',   // New American Standard Bible 1995
   'NASB95': 'b8ee27bcd1cae43a-01',   // NASB 1995 (same text)
   'LSV':    '01b29f4b342acc35-01',   // Literal Standard Version
+};
+
+// ── bible.helloao.org  (free, no key, fetches full chapter) ──────────────────
+// Maps our translation abbreviations to helloao.org translation IDs.
+// API: https://bible.helloao.org/api/{id}/{USFM_BOOK}/{chapter}.json
+const HELLOAO_MAP = {
+  'BSB': 'BSB',    // Berean Standard Bible
 };
 
 // USFM book codes used by api.bible passage IDs  (e.g. "John 3:16" → "JHN.3.16")
