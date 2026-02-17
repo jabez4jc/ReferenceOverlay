@@ -10,13 +10,15 @@ network.
 ## Features
 
 - **Three overlay modes** — Bible Reference, Speaker / Lower Third, News Ticker
-- **8 lower-third styles** — Classic, Accent Line, Minimal, Outline, Gradient Fade, Solid, Split Lines, Frosted Glass
+- **10 lower-third styles** — Classic, Accent Line, Minimal, Outline, Gradient Fade, Scripture Wrap, Scripture Panel, Solid, Split Lines, Frosted Glass
 - **Custom HTML/CSS templates** — full code editor with live preview and built-in examples
 - **Logo & background image** — upload per-session with position and fit controls
-- **40+ Bible translations** — with live verse-text lookup (free and premium tiers)
+- **50+ Bible translations** — with live verse-text lookup (free and premium tiers)
+- **Multilingual references** — reference language selector with bilingual book names (English + selected language)
+- **Per-line text controls** — independent line 1 / line 2 color, size, weight, italic, shadow, and stroke controls
 - **Real-time sync** — WebSocket server relays messages across applications and devices
 - **OBS/vMix Browser Source** — transparent mode or chroma key, state replayed on connect
-- **Presets** — save, load, export, and import reference and ticker presets
+- **Presets** — save, load, export, and import reference, ticker, and template presets
 - **Multi-device control** — run the control panel on a phone or tablet, output in OBS
 - **Session isolation** — multiple operators work independently on the same server
 - **Session watermark** — toggle session ID display on the output window for easy pairing
@@ -331,17 +333,21 @@ the same browser. If you need OBS Browser Source, deploy Option B or C instead.
 | **Book** | All 66 books, grouped by Old / New Testament |
 | **Chapter** | Chapter number (1 to maximum for the book) |
 | **Verse** | Supports single (`3`), ranges (`3–5`), and mixed (`3, 5–7, 10`) |
-| **Translation** | 40+ options. Free-tier translations show live verse text; others show reference only |
+| **Translation** | 50+ options, grouped by language and lookup availability |
+| **Reference Language** | English, Hindi, Tamil, Telugu, Malayalam, Kannada (book names shown as Local + English) |
 
-Verse text is fetched live using a three-tier system:
+Verse text is fetched live using a multi-source fallback system:
 
 | Tier | Source | Translations |
 |---|---|---|
-| 1 | [bible-api.com](https://bible-api.com) (free, no key) | KJV, ASV, WEB, YLT, DARBY, BBE |
-| 2 | [api.bible](https://scripture.api.bible) (API key) | AMP, MSG, NASB, NASB95, LSV |
+| 1 | Local BibleGateway proxy (`/api/verse`) | Broad BibleGateway-supported list (including multiple Indic translations) |
+| 2 | [bible-api.com](https://bible-api.com) (free, no key) | KJV, ASV, WEB, YLT, DARBY, BBE |
 | 3 | [bible.helloao.org](https://bible.helloao.org) (free, no key) | BSB |
+| 4 | Local YouVersion proxy (`/api/youversion`) | Additional free translations including Indic |
+| 5 | [api.bible](https://scripture.api.bible) (API key) | AMP, MSG, NASB, NASB95, LSV |
 
-Results are cached for the session.
+If the selected source fails, the app attempts same-language alternatives before falling
+back to default NASB retrieval. Results are cached per session.
 
 ![Output window — Bible reference overlay on chroma key background](assets/screenshots/output-reference.png)
 
@@ -372,11 +378,12 @@ Results are cached for the session.
 |---|---|
 | **Chroma Key Background** | Blue `#0000FF` · Green `#00B140` · Magenta `#FF00FF` · Custom · Transparent |
 | **Animation** | Fade · Slide Up · None (instant) |
-| **Lower Third Style** | Classic · Accent Line · Minimal · Outline · Gradient Fade · Solid · Split Lines · Frosted Glass |
+| **Lower Third Style** | Classic · Accent Line · Minimal · Outline · Gradient Fade · Scripture Wrap · Scripture Panel · Solid · Split Lines · Frosted Glass |
 | **Accent Color** | Colour picker — default gold `#C8A951` |
 | **Position** | Lower Third · Upper Third · Centered |
 | **Text Alignment** | Left · Center · Right |
-| **Font** | 15 options across Display, Elegant Serif, Modern Sans, and System categories |
+| **Font** | Extended options across Display, Elegant Serif, Modern Sans, Indic Script, and System categories |
+| **Text Effects (Line 1 / Line 2)** | Font weight · Italic · Size scale · Optional custom color · Shadow direction/depth/blur/opacity · Stroke width/color |
 | **Output Resolution** | 1920 × 1080 (Full HD) · 1280 × 720 (HD) · 3840 × 2160 (4K UHD) |
 | **Lower Third BG Image** | Upload image · Fit (Cover / Contain / Stretch) · Focus (Top / Center / Bottom) · Min height |
 | **Logo** | Upload PNG/SVG · Position (Left / Right) · Size (40–240 px) |
@@ -415,6 +422,7 @@ Save and recall frequently used references or ticker messages.
 - **Delete** — click the × on any preset chip.
 - **Export** — download all presets as `overlay-presets.json` for backup or sharing.
 - **Import** — merge presets from a JSON file (duplicate IDs are skipped).
+- **Template presets** — save/load/delete custom HTML+CSS template presets from Settings.
 
 Presets are stored in `localStorage` and shared across all sessions on the same browser.
 
@@ -424,6 +432,8 @@ Presets are stored in `localStorage` and shared across all sessions on the same 
 
 Enable **Settings → Custom Template** to replace the built-in lower-third with your
 own HTML and CSS. Five built-in examples are included as starting points.
+Template presets can be saved/loaded, and template presets are included in presets
+export/import.
 
 ### Template variables
 
@@ -477,10 +487,12 @@ For local file use, Chrome or Edge is recommended.
 Edit `js/data.js` and add an entry to the `TRANSLATIONS` array:
 
 ```js
-{ abbr: 'MY-VER', name: 'My Translation Name' },
+{ abbr: 'MY-VER', name: 'My Translation Name', lang: 'en', bg: false },
 ```
 
 Translations listed under **Reference Only** in the UI will not attempt a verse lookup.
 To enable verse lookup for a custom translation, verify it is supported by
-[bible-api.com](https://bible-api.com) or [api.bible](https://api.bible) and add the
-correct tier marker.
+[BibleGateway](https://www.biblegateway.com), [YouVersion](https://www.bible.com),
+[bible-api.com](https://bible-api.com), [bible.helloao.org](https://bible.helloao.org),
+or [api.bible](https://api.bible), then map it in `BIBLEGATEWAY_MAP`, `YOUVERSION_MAP`,
+`BIBLE_API_MAP`, `HELLOAO_MAP`, or `APIBIBLE_IDS` respectively.
