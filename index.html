@@ -10,7 +10,7 @@
   <!-- Google Fonts: Display, Elegant Serif, and Modern Sans options -->
   <link rel="preconnect" href="https://fonts.googleapis.com" />
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
-  <link href="https://fonts.googleapis.com/css2?family=Bebas+Neue&family=Cinzel:wght@400;700&family=Cinzel+Decorative:wght@400;700&family=Cormorant+Garamond:wght@400;700&family=Crimson+Pro:wght@400;700&family=EB+Garamond:wght@400;700&family=Josefin+Sans:wght@400;700&family=Libre+Baskerville:wght@400;700&family=Lora:wght@400;700&family=Merriweather:wght@400;700&family=Montserrat:wght@400;700&family=Noto+Sans+Devanagari:wght@400;700&family=Noto+Sans+Kannada:wght@400;700&family=Noto+Sans+Malayalam:wght@400;700&family=Noto+Sans+Tamil:wght@400;700&family=Noto+Sans+Telugu:wght@400;700&family=Oswald:wght@400;700&family=Playfair+Display:wght@400;700&family=Raleway:wght@400;700&display=swap" rel="stylesheet" />
+  <link href="https://fonts.googleapis.com/css2?family=Albert+Sans:wght@300;400;500;600;700;800;900&family=Anton&family=Archivo:wght@400;500;600;700;800&family=Bebas+Neue&family=Cinzel:wght@400;700&family=Cinzel+Decorative:wght@400;700&family=Concert+One&family=Cormorant+Garamond:wght@400;700&family=Crimson+Pro:wght@400;700&family=EB+Garamond:wght@400;700&family=Geist:wght@300;400;500;600;700;800;900&family=Inter:wght@300;400;500;600;700;800;900&family=Josefin+Sans:wght@400;700&family=Lexend:wght@300;400;500;600;700;800&family=Libre+Baskerville:wght@400;700&family=Lora:wght@400;700&family=Merriweather:wght@400;700&family=Montserrat:wght@400;700&family=Noto+Sans+Devanagari:wght@400;700&family=Noto+Sans+Kannada:wght@400;700&family=Noto+Sans+Malayalam:wght@400;700&family=Noto+Sans+Tamil:wght@400;700&family=Noto+Sans+Telugu:wght@400;700&family=Nunito:wght@300;400;500;600;700;800;900&family=Oswald:wght@400;700&family=Playfair+Display:wght@400;700&family=Poppins:wght@300;400;500;600;700;800;900&family=Quicksand:wght@300;400;500;600;700&family=Raleway:wght@400;700&family=Rethink+Sans:wght@400;500;600;700;800&family=Rubik:wght@300;400;500;600;700;800;900&family=Unbounded:wght@300;400;500;600;700;800;900&display=swap" rel="stylesheet" />
   <link rel="stylesheet" href="css/control.css" />
 </head>
 <body>
@@ -477,15 +477,8 @@
           </div>
         </div>
 
-        <!-- Font + Resolution -->
+        <!-- Output Resolution -->
         <div class="setting-row">
-          <div class="setting-group">
-            <label class="setting-label" for="font-select">Font</label>
-            <select id="font-select" onchange="onSettingsChange()">
-              <!-- populated by JS from FONT_OPTIONS -->
-            </select>
-          </div>
-
           <div class="setting-group">
             <label class="setting-label" for="output-res">Output Resolution</label>
             <select id="output-res" onchange="onSettingsChange()">
@@ -507,6 +500,12 @@
             <div class="text-effects-grid">
               <div class="text-effects-card" id="textfx-card-line1">
                 <div class="text-effects-title">Line 1</div>
+                <div class="setting-group">
+                  <label class="setting-label" for="line1-font-select">Font</label>
+                  <select id="line1-font-select" onchange="onLineFontChange('line1')">
+                    <!-- populated by JS from FONT_OPTIONS -->
+                  </select>
+                </div>
                 <div class="setting-group">
                   <label class="setting-label" for="line1-font-weight">Font Weight</label>
                   <select id="line1-font-weight" onchange="onSettingsChange()">
@@ -593,6 +592,12 @@
 
               <div class="text-effects-card" id="textfx-card-line2" style="display:none">
                 <div class="text-effects-title">Line 2</div>
+                <div class="setting-group">
+                  <label class="setting-label" for="line2-font-select">Font</label>
+                  <select id="line2-font-select" onchange="onLineFontChange('line2')">
+                    <!-- populated by JS from FONT_OPTIONS -->
+                  </select>
+                </div>
                 <div class="setting-group">
                   <label class="setting-label" for="line2-font-weight">Font Weight</label>
                   <select id="line2-font-weight" onchange="onSettingsChange()">
@@ -814,7 +819,7 @@
             <div class="template-fields">
               <div class="template-field-group">
                 <label class="setting-label">HTML
-                  <span class="label-hint">Variables: &#123;&#123;line1&#125;&#125; &#123;&#123;line2&#125;&#125; &#123;&#123;accentColor&#125;&#125; &#123;&#123;font&#125;&#125; &#123;&#123;logoUrl&#125;&#125; &#123;&#123;bgUrl&#125;&#125;</span>
+                  <span class="label-hint">Variables: &#123;&#123;line1&#125;&#125; &#123;&#123;line2&#125;&#125; &#123;&#123;accentColor&#125;&#125; &#123;&#123;font&#125;&#125; &#123;&#123;line1Font&#125;&#125; &#123;&#123;line2Font&#125;&#125; &#123;&#123;logoUrl&#125;&#125; &#123;&#123;bgUrl&#125;&#125;</span>
                 </label>
                 <textarea id="template-html" class="template-textarea" rows="6"
                   onchange="onSettingsChange()" oninput="onSettingsChange()"

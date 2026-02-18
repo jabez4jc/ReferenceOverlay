@@ -291,15 +291,14 @@ function applySettings(s) {
     ltCustomWrap.classList.add('pos-' + (s.position || 'lower'));
   }
 
-  // ── Font ──────────────────────────────────────────────────────────────────
-  if (s.font) {
-    const font = resolvedFontFamily(s.font);
-    ltLine1.style.fontFamily = font;
-    ltLine2.style.fontFamily = font;
-    if (ltText)      ltText.style.fontFamily      = font;
-    if (tickerText)  tickerText.style.fontFamily  = font;
-    if (tickerBadge) tickerBadge.style.fontFamily = font;
-  }
+  // ── Fonts ─────────────────────────────────────────────────────────────────
+  const line1Font = resolvedFontFamily(s.line1Font || s.font);
+  const line2Font = resolvedFontFamily(s.line2Font || s.line1Font || s.font);
+  ltLine1.style.fontFamily = line1Font;
+  ltLine2.style.fontFamily = line2Font;
+  if (ltText)      ltText.style.fontFamily      = line1Font;
+  if (tickerText)  tickerText.style.fontFamily  = line1Font;
+  if (tickerBadge) tickerBadge.style.fontFamily = line1Font;
 
   // ── Text alignment ────────────────────────────────────────────────────────
   if (ltText) {
@@ -372,11 +371,15 @@ function applySettings(s) {
 
 // ── Custom Template Rendering ─────────────────────────────────────────────────
 function substituteVars(str, s, data) {
+  const line1Font = resolvedFontFamily(s.line1Font || s.font);
+  const line2Font = resolvedFontFamily(s.line2Font || s.line1Font || s.font);
   return str
     .replace(/\{\{line1\}\}/g,       (data && data.line1)  ? escapeHtml(data.line1)  : '')
     .replace(/\{\{line2\}\}/g,       (data && data.line2)  ? escapeHtml(data.line2)  : '')
     .replace(/\{\{accentColor\}\}/g, s.accentColor  || '#C8A951')
-    .replace(/\{\{font\}\}/g,        resolvedFontFamily(s.font))
+    .replace(/\{\{font\}\}/g,        line1Font)
+    .replace(/\{\{line1Font\}\}/g,   line1Font)
+    .replace(/\{\{line2Font\}\}/g,   line2Font)
     .replace(/\{\{logoUrl\}\}/g,     s.logoDataUrl   || '')
     .replace(/\{\{bgUrl\}\}/g,       s.ltBgImage     || '');
 }

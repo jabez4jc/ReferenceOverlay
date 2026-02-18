@@ -70,6 +70,18 @@ const LANGUAGE_DEFAULT_FONT = {
   ml: "'Noto Sans Malayalam', sans-serif",
   kn: "'Noto Sans Kannada', sans-serif",
 };
+const FONT_WEIGHT_LABELS = {
+  100: 'Thin',
+  200: 'Extra Light',
+  300: 'Light',
+  400: 'Regular',
+  500: 'Medium',
+  600: 'Semi Bold',
+  700: 'Bold',
+  800: 'Extra Bold',
+  900: 'Black',
+};
+const FALLBACK_FONT_WEIGHTS = [400, 700];
 const DEFAULT_TEXT_EFFECTS = {
   line1: {
     fontWeight: 700,
@@ -253,7 +265,17 @@ function populateTranslations() {
 }
 
 function populateFonts() {
-  const sel = document.getElementById('font-select');
+  const line1Sel = document.getElementById('line1-font-select');
+  const line2Sel = document.getElementById('line2-font-select');
+  populateFontSelect(line1Sel, "'Cinzel', serif");
+  populateFontSelect(line2Sel, "'Cinzel', serif");
+  populateFontWeightSelect('line1', DEFAULT_TEXT_EFFECTS.line1.fontWeight);
+  populateFontWeightSelect('line2', DEFAULT_TEXT_EFFECTS.line2.fontWeight);
+}
+
+function populateFontSelect(sel, defaultValue) {
+  if (!sel) return;
+  sel.innerHTML = '';
   let lastGroup = '';
   FONT_OPTIONS.forEach(f => {
     if (f.group !== lastGroup) {
@@ -267,7 +289,51 @@ function populateFonts() {
     opt.textContent = f.label;
     sel.lastElementChild.appendChild(opt);
   });
-  sel.value = "'Cinzel', serif";
+  sel.value = defaultValue;
+}
+
+function getFontOptionByValue(value) {
+  return FONT_OPTIONS.find(f => f.value === value) || null;
+}
+
+function getSupportedWeightsForFont(fontValue) {
+  const match = getFontOptionByValue(fontValue);
+  const list = Array.isArray(match?.weights) && match.weights.length
+    ? match.weights
+    : FALLBACK_FONT_WEIGHTS;
+  return Array.from(new Set(list.map(v => parseInt(v, 10)).filter(v => Number.isFinite(v))))
+    .sort((a, b) => a - b);
+}
+
+function populateFontWeightSelect(lineKey, preferredWeight) {
+  const fontSel = document.getElementById(`${lineKey}-font-select`);
+  const weightSel = document.getElementById(`${lineKey}-font-weight`);
+  if (!fontSel || !weightSel) return;
+
+  const weights = getSupportedWeightsForFont(fontSel.value);
+  const desired = parseInt(preferredWeight ?? weightSel.value, 10);
+  let nextWeight = weights[0] || 400;
+  if (Number.isFinite(desired) && weights.includes(desired)) {
+    nextWeight = desired;
+  } else if (Number.isFinite(desired) && weights.length) {
+    nextWeight = weights.reduce((best, cur) => {
+      return Math.abs(cur - desired) < Math.abs(best - desired) ? cur : best;
+    }, weights[0]);
+  }
+
+  weightSel.innerHTML = '';
+  weights.forEach(w => {
+    const opt = document.createElement('option');
+    opt.value = String(w);
+    opt.textContent = `${FONT_WEIGHT_LABELS[w] || 'Weight'} (${w})`;
+    if (w === nextWeight) opt.selected = true;
+    weightSel.appendChild(opt);
+  });
+}
+
+function onLineFontChange(lineKey) {
+  populateFontWeightSelect(lineKey);
+  onSettingsChange();
 }
 
 function getReferenceLanguage() {
@@ -309,13 +375,16 @@ function resolvedFontFamily(fontValue) {
 }
 
 function maybeApplyLanguageFont(lang, force = false) {
-  const sel = document.getElementById('font-select');
-  if (!sel) return;
-  const current = sel.value;
+  const line1Sel = document.getElementById('line1-font-select');
+  const line2Sel = document.getElementById('line2-font-select');
+  if (!line1Sel || !line2Sel) return;
+  const currentLine1 = line1Sel.value;
+  const currentLine2 = line2Sel.value;
   const next = LANGUAGE_DEFAULT_FONT[lang] || LANGUAGE_DEFAULT_FONT.en;
-  if (force || current === LANGUAGE_DEFAULT_FONT.en) {
-    sel.value = next;
-  }
+  if (force || currentLine1 === LANGUAGE_DEFAULT_FONT.en) line1Sel.value = next;
+  if (force || currentLine2 === LANGUAGE_DEFAULT_FONT.en) line2Sel.value = next;
+  populateFontWeightSelect('line1');
+  populateFontWeightSelect('line2');
 }
 
 function getLineTextEffect(settings, lineKey) {
@@ -1042,11 +1111,15 @@ function escapeHtml(str) {
 }
 
 function substitutePreviewVars(str, s, data) {
+  const line1Font = resolvedFontFamily(s.line1Font || s.font);
+  const line2Font = resolvedFontFamily(s.line2Font || s.line1Font || s.font);
   return str
     .replace(/\{\{line1\}\}/g,       data?.line1 ? escapeHtml(data.line1) : '')
     .replace(/\{\{line2\}\}/g,       data?.line2 ? escapeHtml(data.line2) : '')
     .replace(/\{\{accentColor\}\}/g, s.accentColor || '#C8A951')
-    .replace(/\{\{font\}\}/g,        resolvedFontFamily(s.font))
+    .replace(/\{\{font\}\}/g,        line1Font)
+    .replace(/\{\{line1Font\}\}/g,   line1Font)
+    .replace(/\{\{line2Font\}\}/g,   line2Font)
     .replace(/\{\{logoUrl\}\}/g,     s.logoDataUrl  || '')
     .replace(/\{\{bgUrl\}\}/g,       s.ltBgImage    || '');
 }
@@ -1224,12 +1297,16 @@ function updatePreview() {
 
   const ltText = lt.querySelector('.lt-text');
   if (ltText) {
-    ltText.style.fontFamily = resolvedFontFamily(settings.font);
+    ltText.style.fontFamily = resolvedFontFamily(settings.line1Font || settings.font);
     ltText.style.textAlign  = settings.textAlign || 'left';
   }
+  const previewLine1 = document.getElementById('preview-line1');
+  const previewLine2 = document.getElementById('preview-line2');
+  if (previewLine1) previewLine1.style.fontFamily = resolvedFontFamily(settings.line1Font || settings.font);
+  if (previewLine2) previewLine2.style.fontFamily = resolvedFontFamily(settings.line2Font || settings.line1Font || settings.font);
   applyLineTextEffects(
-    document.getElementById('preview-line1'),
-    document.getElementById('preview-line2'),
+    previewLine1,
+    previewLine2,
     settings
   );
 }
@@ -1612,9 +1689,11 @@ function updateProgramMonitor() {
       applyMonitorTextFit(pgmLt, pgmViewport, s?.style || 'gradient', programOverlayData.line2 || '');
       if (pgmAccent) pgmAccent.style.background  = s?.accentColor || '#C8A951';
       if (pgmLtText) {
-        pgmLtText.style.fontFamily = resolvedFontFamily(s?.font);
+        pgmLtText.style.fontFamily = resolvedFontFamily(s?.line1Font || s?.font);
         pgmLtText.style.textAlign  = s?.textAlign || 'left';
       }
+      if (pgmLine1) pgmLine1.style.fontFamily = resolvedFontFamily(s?.line1Font || s?.font);
+      if (pgmLine2) pgmLine2.style.fontFamily = resolvedFontFamily(s?.line2Font || s?.line1Font || s?.font);
       applyLineTextEffects(pgmLine1, pgmLine2, s || {});
       if (pgmLogo) {
         if (s?.logoDataUrl) { pgmLogo.src = s.logoDataUrl; pgmLogo.classList.remove('hidden'); }
@@ -1833,6 +1912,8 @@ function getSettings() {
   }
 
   const alignRadio = document.querySelector('input[name="textAlign"]:checked');
+  const line1Font = document.getElementById('line1-font-select')?.value || "'Cinzel', serif";
+  const line2Font = document.getElementById('line2-font-select')?.value || line1Font;
   const line1Fx = {
     fontWeight:   parseInt(document.getElementById('line1-font-weight')?.value || String(DEFAULT_TEXT_EFFECTS.line1.fontWeight), 10),
     italic:       !!document.getElementById('line1-italic')?.checked,
@@ -1868,7 +1949,9 @@ function getSettings() {
     style:         document.getElementById('style-select')?.value     || 'gradient',
     accentColor:   document.getElementById('accent-color')?.value     || '#C8A951',
     position:      document.getElementById('position-select')?.value  || 'lower',
-    font:          document.getElementById('font-select')?.value      || "'Cinzel', serif",
+    font:          line1Font, // legacy compatibility for templates/saved presets
+    line1Font,
+    line2Font,
     outputRes:     document.getElementById('output-res')?.value       || '1920x1080',
     textAlign:     alignRadio ? alignRadio.value                      : 'left',
     ltBgImage:     ltBgDataUrl,
@@ -1956,7 +2039,11 @@ function loadSettings() {
     if (saved.style)        document.getElementById('style-select').value    = saved.style;
     if (saved.accentColor)  document.getElementById('accent-color').value    = saved.accentColor;
     if (saved.position)     document.getElementById('position-select').value = saved.position;
-    if (saved.font)         document.getElementById('font-select').value     = saved.font;
+    const legacyFont = saved.font || "'Cinzel', serif";
+    const line1Sel = document.getElementById('line1-font-select');
+    const line2Sel = document.getElementById('line2-font-select');
+    if (line1Sel) line1Sel.value = saved.line1Font || legacyFont;
+    if (line2Sel) line2Sel.value = saved.line2Font || saved.line1Font || legacyFont;
     if (saved.outputRes)    document.getElementById('output-res').value      = saved.outputRes;
     if (saved.logoPosition) document.getElementById('logo-position').value   = saved.logoPosition;
 
@@ -2026,6 +2113,8 @@ function onLtMinHeightInput() {
 function setTextEffectsUI(textEffects) {
   const l1 = { ...DEFAULT_TEXT_EFFECTS.line1, ...(textEffects?.line1 || {}) };
   const l2 = { ...DEFAULT_TEXT_EFFECTS.line2, ...(textEffects?.line2 || {}) };
+  populateFontWeightSelect('line1', l1.fontWeight);
+  populateFontWeightSelect('line2', l2.fontWeight);
 
   const map = [
     ['line1-font-weight', l1.fontWeight],
@@ -2094,7 +2183,7 @@ function onTextFxRangeInput(inputId, labelId, suffix = '') {
 }
 
 // ── Custom Template Examples ──────────────────────────────────────────────────
-// Template variables: {{line1}} {{line2}} {{accentColor}} {{font}}
+// Template variables: {{line1}} {{line2}} {{accentColor}} {{font}} {{line1Font}} {{line2Font}}
 //                     {{logoUrl}} (logo data-URL)  {{bgUrl}} (bg image data-URL)
 
 const TEMPLATE_EXAMPLES = {
