@@ -8,6 +8,10 @@ Use it to drive an output overlay for:
 
 It is designed for OBS, vMix, Wirecast, and browser-based output workflows.
 
+## Live Demo
+
+Try it here: `https://overlay.simplifyed.in`
+
 ## What You Can Do
 
 - Switch between `Bible Reference`, `Speaker`, and `Ticker` modes.
