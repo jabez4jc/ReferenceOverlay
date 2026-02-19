@@ -275,6 +275,34 @@ h1 {
   gap: 16px 14px;
 }
 
+/* Compact Bible form layout (desktop):
+   Row 1: Book | Chapter | Verse(s)
+   Row 2: Translation | Reference Language
+   Row 3: Line options checkboxes */
+.bible-grid {
+  grid-template-columns: minmax(220px, 1.45fr) minmax(120px, 0.7fr) minmax(220px, 1.15fr);
+  gap: 12px 12px;
+}
+.bible-grid .bible-book { grid-column: 1; }
+.bible-grid .bible-chapter { grid-column: 2; }
+.bible-grid .bible-verse { grid-column: 3; }
+.bible-grid .bible-translation { grid-column: 1 / span 2; }
+.bible-grid .bible-ref-lang { grid-column: 3; }
+.bible-grid .bible-line-options {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(220px, 1fr));
+  gap: 8px 14px;
+  margin-top: -2px;
+}
+
+/* Compact Speaker layout (desktop): Name + Title on one row */
+.speaker-grid {
+  grid-template-columns: minmax(280px, 1.3fr) minmax(220px, 1fr);
+  gap: 12px;
+}
+.speaker-grid .speaker-name { grid-column: 1; }
+.speaker-grid .speaker-title { grid-column: 2; }
+
 .field-group { display: flex; flex-direction: column; gap: 6px; }
 .field-group.span-2  { grid-column: span 2; }
 .field-group.span-full { grid-column: 1 / -1; }
@@ -441,9 +469,10 @@ input::placeholder { color: var(--text-dim); }
   position: absolute;
   left: 0;
   right: 0;
-  bottom: 8%;
-  padding: 0 3%;
+  bottom: 10%;
+  padding: 0 4%;
   overflow: hidden;
+  pointer-events: none;
 }
 .preview-custom-wrap.pos-upper  { bottom: auto; top: 8%; }
 .preview-custom-wrap.pos-center { bottom: auto; top: 50%; transform: translateY(-50%); }
@@ -452,18 +481,20 @@ input::placeholder { color: var(--text-dim); }
   position: absolute;
   left: 0;
   right: 0;
-  bottom: 8%;
-  padding: 0 3%;
+  bottom: 10%;
+  padding: 0 4%;
 }
 .lower-third-wrap.pos-upper  { bottom: auto; top: 8%; }
 .lower-third-wrap.pos-center { bottom: auto; top: 50%; transform: translateY(-50%); }
 
 /* Scale a 1920x1080 custom-template stage into monitor viewport. */
 .monitor-custom-stage {
+  position: relative;
   width: 1920px;
-  height: 1080px;
+  min-height: 1px;
   transform-origin: top left;
   pointer-events: none;
+  will-change: transform;
 }
 
 .lower-third {
@@ -569,6 +600,13 @@ input::placeholder { color: var(--text-dim); }
 }
 .btn-show:hover { background: var(--show-btn-h); box-shadow: 0 4px 14px rgba(56,142,60,.5); }
 .btn-show:active { transform: scale(.97); }
+.btn-show:disabled {
+  background: #2b3f2c;
+  color: rgba(255,255,255,.45);
+  box-shadow: none;
+  cursor: not-allowed;
+}
+.btn-show:disabled svg { opacity: .55; }
 
 .btn-clear {
   background: var(--clear-btn);
@@ -1374,6 +1412,41 @@ input[type="color"] {
   min-height: 28px;
 }
 
+.settings-profiles {
+  border-top: 1px solid var(--border);
+  padding-top: 10px;
+  padding-bottom: 8px;
+}
+
+.settings-profiles-label {
+  font-size: .72rem;
+  font-weight: 600;
+  letter-spacing: .06em;
+  text-transform: uppercase;
+  color: var(--text-muted);
+  margin-bottom: 7px;
+}
+
+.settings-profiles-row {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px;
+}
+
+.settings-profiles-select {
+  min-width: 220px;
+  max-width: 300px;
+  flex: 1 1 240px;
+  height: 30px;
+  padding: 4px 9px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  background: var(--surface-2);
+  color: var(--text);
+  font-size: .78rem;
+}
+
 .presets-empty {
   font-size: .78rem;
   color: var(--text-dim);
@@ -1517,6 +1590,19 @@ input[type="color"] {
 }
 .ticker-panel-grid .span-full { grid-column: 1 / -1; }
 
+/* Compact Ticker layout (desktop):
+   Row 1: message
+   Row 2: badge | speed | style | position */
+.ticker-grid {
+  grid-template-columns: repeat(4, minmax(150px, 1fr));
+  gap: 12px;
+}
+.ticker-grid .span-full { grid-column: 1 / -1; }
+.ticker-grid .ticker-badge { grid-column: 1; }
+.ticker-grid .ticker-speed { grid-column: 2; }
+.ticker-grid .ticker-style { grid-column: 3; }
+.ticker-grid .ticker-position { grid-column: 4; }
+
 /* Custom color row — hidden unless "custom" is selected */
 #ticker-custom-colors { display: none; }
 #ticker-custom-colors.visible { display: contents; }
@@ -1595,13 +1681,64 @@ kbd {
     grid-template-columns: 1fr;
   }
 
-  .actions { grid-template-columns: 1fr; }
+  .actions { grid-template-columns: 1fr 1fr; }
 
   .align-options {
     flex-wrap: wrap;
   }
 
   h1 { font-size: 1rem; }
+
+  .app-main { padding: 10px; gap: 12px; }
+  .panel { padding: 12px; }
+  .presets-section { padding: 8px 12px 2px; }
+  .kbd-hint { font-size: .68rem; }
+
+  /* Keep monitors side-by-side and shorter on small phones */
+  .monitors-section { grid-template-columns: 1fr 1fr; gap: 6px; }
+  .monitor-viewport,
+  .preview-viewport { aspect-ratio: 16 / 7; }
+  .monitor-label { font-size: .62rem; }
+
+  .btn-show, .btn-clear {
+    padding: 12px 10px;
+    font-size: .82rem;
+    letter-spacing: .07em;
+  }
+
+  .bible-grid {
+    grid-template-columns: 1fr 1fr;
+    gap: 10px 10px;
+  }
+  .bible-grid .bible-book { grid-column: 1 / -1; }
+  .bible-grid .bible-chapter { grid-column: 1; }
+  .bible-grid .bible-verse { grid-column: 2; }
+  .bible-grid .bible-translation { grid-column: 1 / -1; }
+  .bible-grid .bible-ref-lang { grid-column: 1 / -1; }
+  .bible-grid .bible-line-options { grid-template-columns: 1fr; gap: 6px; }
+
+  .speaker-grid {
+    grid-template-columns: 1fr;
+    gap: 10px;
+  }
+  .speaker-grid .speaker-name,
+  .speaker-grid .speaker-title { grid-column: 1 / -1; }
+
+  .ticker-grid {
+    grid-template-columns: 1fr 1fr;
+    gap: 10px;
+  }
+  .ticker-grid .ticker-badge,
+  .ticker-grid .ticker-speed,
+  .ticker-grid .ticker-style,
+  .ticker-grid .ticker-position { grid-column: auto; }
+}
+
+@media (max-width: 420px) {
+  .ticker-grid {
+    grid-template-columns: 1fr;
+    gap: 10px;
+  }
 }
 
 @media (max-width: 1100px) {
@@ -1637,6 +1774,16 @@ kbd {
 
 @media (max-width: 900px) {
   .monitors-section { grid-template-columns: 1fr 1fr; gap: 8px; }
+  .bible-grid {
+    grid-template-columns: minmax(170px, 1.1fr) minmax(110px, 0.7fr) minmax(170px, 1fr);
+  }
+  .bible-grid .bible-line-options {
+    grid-template-columns: 1fr 1fr;
+  }
+
+  .ticker-grid {
+    grid-template-columns: 1fr 1fr;
+  }
 }
 
 @media (max-width: 700px) {
@@ -1675,6 +1822,51 @@ kbd {
     padding: 11px 8px;
     font-size: .82rem;
   }
+
+  .app-main { padding: 12px; gap: 14px; }
+  .control-column { gap: 14px; }
+  .panel { padding: 14px; }
+  .field-grid { gap: 12px 10px; }
+  .label-hint { display: inline; }
+
+  .monitors-section { grid-template-columns: 1fr 1fr; gap: 7px; }
+  .monitor-viewport,
+  .preview-viewport { aspect-ratio: 16 / 8; }
+
+  .actions {
+    position: sticky;
+    bottom: 0;
+    z-index: 10;
+    padding-top: 6px;
+    background: linear-gradient(to top, rgba(15,17,23,1) 70%, rgba(15,17,23,0));
+  }
+
+  .bible-grid {
+    grid-template-columns: 1fr 1fr;
+    gap: 10px 10px;
+  }
+  .bible-grid .bible-book { grid-column: 1 / -1; }
+  .bible-grid .bible-chapter { grid-column: 1; }
+  .bible-grid .bible-verse { grid-column: 2; }
+  .bible-grid .bible-translation { grid-column: 1 / -1; }
+  .bible-grid .bible-ref-lang { grid-column: 1 / -1; }
+  .bible-grid .bible-line-options { grid-template-columns: 1fr; gap: 6px; }
+
+  .speaker-grid {
+    grid-template-columns: 1fr;
+    gap: 10px;
+  }
+  .speaker-grid .speaker-name,
+  .speaker-grid .speaker-title { grid-column: 1 / -1; }
+
+  .ticker-grid {
+    grid-template-columns: 1fr 1fr;
+    gap: 10px;
+  }
+  .ticker-grid .ticker-badge,
+  .ticker-grid .ticker-speed,
+  .ticker-grid .ticker-style,
+  .ticker-grid .ticker-position { grid-column: auto; }
 }
 
 @media (min-width: 1101px) {

@@ -46,6 +46,7 @@ let referenceOnlyLookup = false;  // true when text is ASV reference, not for ou
 let overlayPresets = [];
 let tickerPresets  = [];
 let templatePresets = [];
+let settingsProfiles = [];
 
 // Communication channels (BroadcastChannel primary; localStorage fallback)
 // All keys are namespaced with SESSION_ID so multiple users don't collide.
@@ -82,6 +83,8 @@ const FONT_WEIGHT_LABELS = {
   900: 'Black',
 };
 const FALLBACK_FONT_WEIGHTS = [400, 700];
+const DEFAULT_TICKER_MESSAGE = 'The Live Stream has been restored. Thank you for your patience, and our sincere apologies for the interruption.';
+const DEFAULT_TICKER_STYLE = 'dark';
 const DEFAULT_TEXT_EFFECTS = {
   line1: {
     fontWeight: 700,
@@ -112,6 +115,8 @@ const DEFAULT_TEXT_EFFECTS = {
     strokeWidth: 0,
   },
 };
+let renderSyncRaf = 0;
+let monitorResizeObserver = null;
 
 // ── Initialise ────────────────────────────────────────────────────────────────
 document.addEventListener('DOMContentLoaded', () => {
@@ -121,6 +126,7 @@ document.addEventListener('DOMContentLoaded', () => {
   populateFonts();
   loadSettings();
   loadPresets();
+  loadSettingsProfiles();
   updatePreview();
   bindKeyboard();
   initWebSocket();
@@ -145,6 +151,8 @@ document.addEventListener('DOMContentLoaded', () => {
 
   initSettingsPanelUi();
   switchTextEffectsLine('line1');
+  initMonitorRenderSync();
+  scheduleMonitorRenderSync();
   // Ensure output windows follow the control's current live state after reload.
   setTimeout(() => syncCurrentStateToOutputs(), 120);
 });
@@ -461,6 +469,7 @@ function setMode(mode) {
 
   renderPresets();
   updatePreview();
+  updateCutToAirButtonState();
 }
 
 // ── Change Handlers ───────────────────────────────────────────────────────────
@@ -478,6 +487,11 @@ function onBibleChange() {
   autoSyncReferenceLanguageFromTranslation();
   validateVerseInput();
   clearVerseText();
+  syncBibleLineOptions();
+  updatePreview();
+}
+function onBibleLineOptionsChange() {
+  syncBibleLineOptions();
   updatePreview();
 }
 function onReferenceLanguageChange() {
@@ -486,7 +500,12 @@ function onReferenceLanguageChange() {
   if (lang !== 'en') maybeApplyLanguageFont(lang, false);
   updatePreview();
 }
-function onSpeakerChange() { updatePreview(); }
+function onSpeakerChange() {
+  const speakerNameEl = document.getElementById('speaker-name');
+  if (speakerNameEl) speakerNameEl.setCustomValidity('');
+  updateCutToAirButtonState();
+  updatePreview();
+}
 
 function onTickerChange() { updatePreview(); }
 
@@ -495,6 +514,21 @@ function onTickerStyleChange() {
   const custom = document.getElementById('ticker-custom-colors');
   if (custom) custom.classList.toggle('visible', style === 'custom');
   updatePreview();
+}
+
+function updateCutToAirButtonState() {
+  const btn = document.getElementById('btn-show');
+  if (!btn) return;
+  if (!btn.dataset.defaultTitle) {
+    btn.dataset.defaultTitle = btn.title || 'Cut to Air';
+  }
+  const speakerName = document.getElementById('speaker-name')?.value.trim() || '';
+  const mustDisable = currentMode === 'speaker' && !speakerName;
+  btn.disabled = mustDisable;
+  btn.setAttribute('aria-disabled', mustDisable ? 'true' : 'false');
+  btn.title = mustDisable
+    ? 'Enter Speaker Name before Cut to Air.'
+    : btn.dataset.defaultTitle;
 }
 
 function autoSyncReferenceLanguageFromTranslation() {
@@ -510,6 +544,25 @@ function autoSyncReferenceLanguageFromTranslation() {
     updateBookOptionLabels();
     maybeApplyLanguageFont(lang, false);
   }
+}
+
+function syncBibleLineOptions() {
+  const translation = document.getElementById('translation')?.value || 'NONE';
+  const hideLine2El = document.getElementById('hide-translation-line2');
+  const includeVerseEl = document.getElementById('include-verse-text');
+  const appendAbbrEl = document.getElementById('append-translation-abbr-line1');
+  if (!appendAbbrEl) return;
+
+  const hideLine2 = !!hideLine2El?.checked;
+  const includeVerse = !!includeVerseEl?.checked;
+  const showingVerseText = includeVerse && !!verseTextCurrent && !referenceOnlyLookup;
+  const line2ShowsFullTranslation = translation !== 'NONE' && !hideLine2 && !showingVerseText;
+  const canAppend = translation !== 'NONE' && (hideLine2 || showingVerseText);
+
+  if (line2ShowsFullTranslation || !canAppend) {
+    appendAbbrEl.checked = false;
+  }
+  appendAbbrEl.disabled = !canAppend;
 }
 
 // ── Verse Reference Validation ────────────────────────────────────────────────
@@ -1008,6 +1061,7 @@ function displayVerseText(text, refOnly = false) {
     }
   }
   if (note) note.style.display = refOnly ? '' : 'none';
+  syncBibleLineOptions();
   updatePreview();
 }
 
@@ -1021,14 +1075,15 @@ function clearVerseText() {
   if (chk)  { chk.checked = false; chk.disabled = false; }
   if (note) note.style.display = 'none';
   setLookupStatus('', '');
+  syncBibleLineOptions();
 }
 
 // ── Build Ticker Data Object ──────────────────────────────────────────────────
 function buildTickerData() {
-  const message  = document.getElementById('ticker-message')?.value.trim() || '';
+  const message  = document.getElementById('ticker-message')?.value.trim() || DEFAULT_TICKER_MESSAGE;
   const label    = document.getElementById('ticker-label')?.value.trim()   || 'INFO';
   const speed    = parseInt(document.getElementById('ticker-speed')?.value) || 140;
-  const style    = document.getElementById('ticker-style')?.value           || 'info';
+  const style    = document.getElementById('ticker-style')?.value           || DEFAULT_TICKER_STYLE;
   const position = document.getElementById('ticker-position')?.value        || 'bottom';
 
   // Resolve colors from style preset or custom pickers
@@ -1076,10 +1131,13 @@ function buildOverlayData() {
 
     const includeText = document.getElementById('include-verse-text')?.checked;
     const hideTranslationLine2 = !!document.getElementById('hide-translation-line2')?.checked;
+    const appendTranslationAbbrLine1 = !!document.getElementById('append-translation-abbr-line1')?.checked;
     const showingText = !!(includeText && verseTextCurrent && !referenceOnlyLookup);
 
-    // Append (ABBR) to the reference line when verse text is shown as line 2
-    const line1 = (showingText && translAbbr !== 'NONE')
+    // Optionally append (ABBR) to the reference line.
+    const showTranslationAbbrOnLine1 = translAbbr !== 'NONE'
+      && (showingText || (appendTranslationAbbrLine1 && hideTranslationLine2));
+    const line1 = showTranslationAbbrOnLine1
       ? `${ref} (${translAbbr})`
       : ref;
 
@@ -1099,7 +1157,7 @@ function buildOverlayData() {
   } else {
     const name  = document.getElementById('speaker-name').value.trim();
     const title = document.getElementById('speaker-title').value.trim();
-    return { type: 'speaker', line1: name || '(Speaker name)', line2: title || '' };
+    return { type: 'speaker', line1: name || '', line2: title || '' };
   }
 }
 
@@ -1174,14 +1232,56 @@ function switchTextEffectsLine(lineKey) {
 
 function applyMonitorCustomStageScale(stageEl, viewportEl) {
   if (!stageEl || !viewportEl) return;
+  const wrapEl = stageEl.parentElement;
   const vw = viewportEl.clientWidth || 320;
-  const vh = viewportEl.clientHeight || 180;
-  const scale = Math.max(0.1, Math.min(vw / 1920, vh / 1080));
+  let padX = 0;
+  if (wrapEl) {
+    const cs = getComputedStyle(wrapEl);
+    const pl = parseFloat(cs.paddingLeft) || 0;
+    const pr = parseFloat(cs.paddingRight) || 0;
+    padX = pl + pr;
+  }
+  const availableW = Math.max(1, vw - padX);
+  const scale = Math.max(0.1, Math.min(1, availableW / 1920));
+  stageEl.style.width = '1920px';
   stageEl.style.transform = `scale(${scale})`;
+  if (wrapEl) {
+    const layoutHeight = Math.max(1, stageEl.offsetHeight || stageEl.scrollHeight || 1);
+    wrapEl.style.height = `${Math.round(layoutHeight * scale)}px`;
+  }
+}
+
+function scheduleMonitorRenderSync() {
+  if (renderSyncRaf) return;
+  renderSyncRaf = requestAnimationFrame(() => {
+    renderSyncRaf = 0;
+    updatePreview();
+    updateProgramMonitor();
+  });
+}
+
+function initMonitorRenderSync() {
+  const previewViewport = document.querySelector('.preview-viewport');
+  const programViewport = document.querySelector('#monitor-program-block .monitor-viewport');
+  const main = document.querySelector('.app-main');
+  const panel = document.getElementById('settings-panel');
+
+  window.addEventListener('resize', scheduleMonitorRenderSync);
+  window.addEventListener('orientationchange', scheduleMonitorRenderSync);
+
+  if (typeof ResizeObserver === 'function') {
+    monitorResizeObserver = new ResizeObserver(() => scheduleMonitorRenderSync());
+    if (previewViewport) monitorResizeObserver.observe(previewViewport);
+    if (programViewport) monitorResizeObserver.observe(programViewport);
+    if (main) monitorResizeObserver.observe(main);
+    if (panel) monitorResizeObserver.observe(panel);
+  }
 }
 
 // ── Preview ───────────────────────────────────────────────────────────────────
 function updatePreview() {
+  updateCutToAirButtonState();
+  if (currentMode === 'bible') syncBibleLineOptions();
   const data     = buildOverlayData();
   const settings = getSettings();
   const useCustom = !!(settings.customTemplate?.enabled && settings.customTemplate?.html);
@@ -1222,7 +1322,6 @@ function updatePreview() {
       customWrap.classList.remove('pos-lower', 'pos-upper', 'pos-center');
       customWrap.classList.add('pos-' + (settings.position || 'lower'));
     }
-    applyMonitorCustomStageScale(customStage, previewViewport);
     if (customEl) {
       customEl.innerHTML = substitutePreviewVars(settings.customTemplate.html, settings, data);
     }
@@ -1234,6 +1333,7 @@ function updatePreview() {
       document.head.appendChild(styleEl);
     }
     styleEl.textContent = substitutePreviewVars(settings.customTemplate.css || '', settings, data);
+    applyMonitorCustomStageScale(customStage, previewViewport);
     return;
   }
 
@@ -1317,6 +1417,7 @@ function updatePreview() {
 const PRESET_KEY_OVERLAY = 'overlayPresets';
 const PRESET_KEY_TICKER  = 'tickerPresets';
 const PRESET_KEY_TEMPLATE = 'templatePresets';
+const SETTINGS_PROFILE_KEY = 'overlaySettingsProfiles';
 
 function loadPresets() {
   try {
@@ -1330,6 +1431,15 @@ function loadPresets() {
   } catch (_) { templatePresets = []; }
   renderPresets();
   renderTemplatePresets();
+}
+
+function loadSettingsProfiles() {
+  try {
+    settingsProfiles = JSON.parse(localStorage.getItem(SETTINGS_PROFILE_KEY) || '[]');
+  } catch (_) {
+    settingsProfiles = [];
+  }
+  renderSettingsProfiles();
 }
 
 function saveCurrentPreset() {
@@ -1363,14 +1473,15 @@ function saveCurrentPreset() {
           verse:       document.getElementById('verse-ref').value,
           translation: document.getElementById('translation').value,
           refLanguage: document.getElementById('reference-language')?.value || 'en',
-          hideLine2:   !!document.getElementById('hide-translation-line2')?.checked }
+          hideLine2:   !!document.getElementById('hide-translation-line2')?.checked,
+          appendAbbrLine1: !!document.getElementById('append-translation-abbr-line1')?.checked }
       : currentMode === 'speaker'
       ? { name:  document.getElementById('speaker-name').value,
           title: document.getElementById('speaker-title').value }
       : { message:  document.getElementById('ticker-message')?.value || '',
           label:    document.getElementById('ticker-label')?.value   || 'INFO',
           speed:    document.getElementById('ticker-speed')?.value   || '140',
-          style:    document.getElementById('ticker-style')?.value   || 'info',
+          style:    document.getElementById('ticker-style')?.value   || DEFAULT_TICKER_STYLE,
           position: document.getElementById('ticker-position')?.value || 'bottom' },
   };
 
@@ -1402,6 +1513,8 @@ function loadPreset(id) {
       if (refLangEl) refLangEl.value = p.data.refLanguage || 'en';
       const hideLine2El = document.getElementById('hide-translation-line2');
       if (hideLine2El) hideLine2El.checked = !!p.data.hideLine2;
+      const appendAbbrEl = document.getElementById('append-translation-abbr-line1');
+      if (appendAbbrEl) appendAbbrEl.checked = !!p.data.appendAbbrLine1;
       updateBookOptionLabels();
       if (refLangEl && refLangEl.value !== 'en') maybeApplyLanguageFont(refLangEl.value, false);
       validateVerseInput();
@@ -1417,7 +1530,7 @@ function loadPreset(id) {
     if (document.getElementById('ticker-speed'))
       document.getElementById('ticker-speed').value    = p.data.speed    || '140';
     if (document.getElementById('ticker-style')) {
-      document.getElementById('ticker-style').value    = p.data.style    || 'info';
+      document.getElementById('ticker-style').value    = p.data.style    || DEFAULT_TICKER_STYLE;
       onTickerStyleChange();
     }
     if (document.getElementById('ticker-position'))
@@ -1482,6 +1595,254 @@ function importPresets() {
         alert(`Imported ${countO} overlay preset(s), ${countT} ticker preset(s), and ${countTpl} template preset(s).`);
       } catch (_) {
         alert('Import failed — file does not appear to be a valid presets export.');
+      }
+    };
+    reader.readAsText(file);
+  };
+  input.click();
+}
+
+// ── Settings Profiles (global, reusable across sessions) ─────────────────────
+function cloneJson(value) {
+  return JSON.parse(JSON.stringify(value));
+}
+
+function buildSessionControlState() {
+  return {
+    mode: currentMode,
+    bible: {
+      book: document.getElementById('book')?.value || 'John',
+      chapter: document.getElementById('chapter')?.value || '3',
+      verseRef: document.getElementById('verse-ref')?.value || '16-18',
+      translation: document.getElementById('translation')?.value || 'NONE',
+      referenceLanguage: document.getElementById('reference-language')?.value || 'en',
+      hideTranslationLine2: !!document.getElementById('hide-translation-line2')?.checked,
+      includeVerseText: !!document.getElementById('include-verse-text')?.checked,
+      appendTranslationAbbrLine1: !!document.getElementById('append-translation-abbr-line1')?.checked,
+    },
+    speaker: {
+      name: document.getElementById('speaker-name')?.value || '',
+      title: document.getElementById('speaker-title')?.value || '',
+    },
+    ticker: {
+      message: document.getElementById('ticker-message')?.value || DEFAULT_TICKER_MESSAGE,
+      label: document.getElementById('ticker-label')?.value || 'INFO',
+      speed: document.getElementById('ticker-speed')?.value || '140',
+      style: document.getElementById('ticker-style')?.value || DEFAULT_TICKER_STYLE,
+      position: document.getElementById('ticker-position')?.value || 'bottom',
+      bgColor: document.getElementById('ticker-bg-color')?.value || '#cc0000',
+      textColor: document.getElementById('ticker-text-color')?.value || '#ffffff',
+    },
+  };
+}
+
+function buildSettingsProfilePayload() {
+  return {
+    settings: getSettings(),
+    controlState: buildSessionControlState(),
+    overlayPresets: cloneJson(overlayPresets),
+    tickerPresets: cloneJson(tickerPresets),
+    templatePresets: cloneJson(templatePresets),
+    exportedAt: Date.now(),
+  };
+}
+
+function saveSettingsProfilesToStorage() {
+  try {
+    localStorage.setItem(SETTINGS_PROFILE_KEY, JSON.stringify(settingsProfiles));
+  } catch (_) {}
+}
+
+function renderSettingsProfiles() {
+  const sel = document.getElementById('settings-profile-select');
+  if (!sel) return;
+  const previous = sel.value;
+  sel.innerHTML = '';
+  const empty = document.createElement('option');
+  empty.value = '';
+  empty.textContent = settingsProfiles.length ? 'Select a profile...' : 'No settings profiles yet';
+  sel.appendChild(empty);
+  settingsProfiles.forEach(profile => {
+    const opt = document.createElement('option');
+    opt.value = profile.id;
+    opt.textContent = profile.label || 'Unnamed profile';
+    sel.appendChild(opt);
+  });
+  if (previous && settingsProfiles.some(p => p.id === previous)) {
+    sel.value = previous;
+  } else {
+    sel.value = '';
+  }
+}
+
+function saveSettingsProfile() {
+  const defaultName = `Session Profile ${new Date().toLocaleString()}`;
+  const label = prompt('Settings profile name:', defaultName);
+  if (label === null || !label.trim()) return;
+
+  const payload = buildSettingsProfilePayload();
+  const existing = settingsProfiles.find(p => p.label.toLowerCase() === label.trim().toLowerCase());
+  let savedId = '';
+  if (existing) {
+    existing.payload = payload;
+    existing.updatedAt = Date.now();
+    savedId = existing.id;
+  } else {
+    const newProfile = {
+      id: Date.now().toString(36) + Math.random().toString(36).slice(2, 6),
+      label: label.trim(),
+      createdAt: Date.now(),
+      updatedAt: Date.now(),
+      payload,
+    };
+    settingsProfiles.push(newProfile);
+    savedId = newProfile.id;
+  }
+  settingsProfiles.sort((a, b) => (b.updatedAt || 0) - (a.updatedAt || 0));
+  saveSettingsProfilesToStorage();
+  renderSettingsProfiles();
+  const sel = document.getElementById('settings-profile-select');
+  if (sel && savedId) sel.value = savedId;
+}
+
+function applyProfileSettingsToSession(profileSettings) {
+  if (!profileSettings || typeof profileSettings !== 'object') return;
+  try {
+    const small = { ...profileSettings, ltBgImage: null, logoDataUrl: null };
+    localStorage.setItem('overlaySettings-' + SESSION_ID, JSON.stringify(small));
+
+    if (profileSettings.ltBgImage) localStorage.setItem('overlayLtBg-' + SESSION_ID, profileSettings.ltBgImage);
+    else localStorage.removeItem('overlayLtBg-' + SESSION_ID);
+
+    if (profileSettings.logoDataUrl) localStorage.setItem('overlayLogo-' + SESSION_ID, profileSettings.logoDataUrl);
+    else localStorage.removeItem('overlayLogo-' + SESSION_ID);
+
+    if (profileSettings.customTemplate) {
+      localStorage.setItem(GLOBAL_TEMPLATE_KEY, JSON.stringify(profileSettings.customTemplate));
+    }
+  } catch (_) {}
+}
+
+function applyProfileControlState(controlState) {
+  if (!controlState || typeof controlState !== 'object') return;
+
+  const bible = controlState.bible || {};
+  const speaker = controlState.speaker || {};
+  const ticker = controlState.ticker || {};
+
+  const bookEl = document.getElementById('book');
+  const chapterEl = document.getElementById('chapter');
+  const verseEl = document.getElementById('verse-ref');
+  const transEl = document.getElementById('translation');
+  const refLangEl = document.getElementById('reference-language');
+  const hideLine2El = document.getElementById('hide-translation-line2');
+  const includeVerseTextEl = document.getElementById('include-verse-text');
+  const appendAbbrLine1El = document.getElementById('append-translation-abbr-line1');
+
+  if (bookEl && bible.book) {
+    bookEl.value = bible.book;
+    populateChapters(bible.book, parseInt(bible.chapter || '1', 10));
+  }
+  if (chapterEl && bible.chapter) chapterEl.value = String(bible.chapter);
+  if (verseEl && bible.verseRef !== undefined) verseEl.value = String(bible.verseRef || '');
+  if (transEl && bible.translation) transEl.value = bible.translation;
+  if (refLangEl) refLangEl.value = bible.referenceLanguage || 'en';
+  if (hideLine2El) hideLine2El.checked = !!bible.hideTranslationLine2;
+  if (includeVerseTextEl) includeVerseTextEl.checked = !!bible.includeVerseText;
+  if (appendAbbrLine1El) appendAbbrLine1El.checked = !!bible.appendTranslationAbbrLine1;
+  updateBookOptionLabels();
+  validateVerseInput();
+
+  const speakerNameEl = document.getElementById('speaker-name');
+  const speakerTitleEl = document.getElementById('speaker-title');
+  if (speakerNameEl) speakerNameEl.value = speaker.name || '';
+  if (speakerTitleEl) speakerTitleEl.value = speaker.title || '';
+
+  const tickerMessageEl = document.getElementById('ticker-message');
+  const tickerLabelEl = document.getElementById('ticker-label');
+  const tickerSpeedEl = document.getElementById('ticker-speed');
+  const tickerStyleEl = document.getElementById('ticker-style');
+  const tickerPositionEl = document.getElementById('ticker-position');
+  const tickerBgEl = document.getElementById('ticker-bg-color');
+  const tickerTextEl = document.getElementById('ticker-text-color');
+  if (tickerMessageEl) tickerMessageEl.value = ticker.message || DEFAULT_TICKER_MESSAGE;
+  if (tickerLabelEl) tickerLabelEl.value = ticker.label || 'INFO';
+  if (tickerSpeedEl) tickerSpeedEl.value = ticker.speed || '140';
+  if (tickerStyleEl) tickerStyleEl.value = ticker.style || DEFAULT_TICKER_STYLE;
+  if (tickerPositionEl) tickerPositionEl.value = ticker.position || 'bottom';
+  if (tickerBgEl) tickerBgEl.value = ticker.bgColor || '#cc0000';
+  if (tickerTextEl) tickerTextEl.value = ticker.textColor || '#ffffff';
+  onTickerStyleChange();
+
+  setMode(controlState.mode || 'bible');
+}
+
+function loadSelectedSettingsProfile() {
+  const sel = document.getElementById('settings-profile-select');
+  if (!sel || !sel.value) return;
+  const profile = settingsProfiles.find(p => p.id === sel.value);
+  if (!profile || !profile.payload) return;
+
+  const payload = profile.payload;
+  overlayPresets = Array.isArray(payload.overlayPresets) ? cloneJson(payload.overlayPresets) : [];
+  tickerPresets = Array.isArray(payload.tickerPresets) ? cloneJson(payload.tickerPresets) : [];
+  templatePresets = Array.isArray(payload.templatePresets) ? cloneJson(payload.templatePresets) : [];
+  savePresetsToStorage();
+  renderPresets();
+  renderTemplatePresets();
+
+  applyProfileSettingsToSession(payload.settings || {});
+  loadSettings();
+  applyProfileControlState(payload.controlState || {});
+  updatePreview();
+}
+
+function deleteSelectedSettingsProfile() {
+  const sel = document.getElementById('settings-profile-select');
+  if (!sel || !sel.value) return;
+  settingsProfiles = settingsProfiles.filter(p => p.id !== sel.value);
+  saveSettingsProfilesToStorage();
+  renderSettingsProfiles();
+}
+
+function exportSettingsProfiles() {
+  const payload = JSON.stringify({ settingsProfiles }, null, 2);
+  const blob = new Blob([payload], { type: 'application/json' });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url;
+  a.download = 'overlay-settings-profiles.json';
+  a.click();
+  URL.revokeObjectURL(url);
+}
+
+function importSettingsProfiles() {
+  const input = document.createElement('input');
+  input.type = 'file';
+  input.accept = '.json,application/json';
+  input.onchange = e => {
+    const file = e.target.files[0];
+    if (!file) return;
+    const reader = new FileReader();
+    reader.onload = ev => {
+      try {
+        const parsed = JSON.parse(ev.target.result);
+        let incoming = [];
+        if (Array.isArray(parsed?.settingsProfiles)) incoming = parsed.settingsProfiles;
+        else if (parsed?.payload) incoming = [parsed];
+        if (!incoming.length) throw new Error('No profiles');
+
+        const byId = new Map(settingsProfiles.map(p => [p.id, p]));
+        incoming.forEach(profile => {
+          if (!profile || !profile.id || !profile.payload) return;
+          byId.set(profile.id, profile);
+        });
+        settingsProfiles = Array.from(byId.values())
+          .sort((a, b) => (b.updatedAt || 0) - (a.updatedAt || 0));
+        saveSettingsProfilesToStorage();
+        renderSettingsProfiles();
+      } catch (_) {
+        alert('Import failed — file does not appear to be a valid settings profile export.');
       }
     };
     reader.readAsText(file);
@@ -1571,6 +1932,20 @@ function sendShow() {
     updateProgramMonitor();
     return;
   }
+
+  if (currentMode === 'speaker') {
+    const speakerNameEl = document.getElementById('speaker-name');
+    const speakerName = speakerNameEl?.value.trim() || '';
+    if (!speakerName) {
+      if (speakerNameEl) {
+        speakerNameEl.setCustomValidity('Speaker name is required before Cut to Air.');
+        speakerNameEl.reportValidity();
+        speakerNameEl.focus();
+      }
+      return;
+    }
+  }
+
   const data     = buildOverlayData();
   const settings = getSettings();
   broadcast({ action: 'show', data, settings });
@@ -1657,7 +2032,6 @@ function updateProgramMonitor() {
         pgmCustomWrap.classList.remove('pos-lower', 'pos-upper', 'pos-center');
         pgmCustomWrap.classList.add('pos-' + (s.position || 'lower'));
       }
-      applyMonitorCustomStageScale(pgmCustomStage, pgmViewport);
       if (pgmCustom) {
         pgmCustom.innerHTML = substitutePreviewVars(s.customTemplate.html, s, programOverlayData);
       }
@@ -1668,6 +2042,7 @@ function updateProgramMonitor() {
         document.head.appendChild(styleEl);
       }
       styleEl.textContent = substitutePreviewVars(s.customTemplate.css || '', s, programOverlayData);
+      applyMonitorCustomStageScale(pgmCustomStage, pgmViewport);
     } else {
       if (pgmCustomWrap) pgmCustomWrap.style.display = 'none';
       const staleProgramStyle = document.getElementById('program-custom-style');
@@ -1760,12 +2135,13 @@ function initSettingsPanelUi() {
   const panel = document.getElementById('settings-panel');
   if (!panel) return;
 
-  // Desktop defaults to open side panel.
-  if (window.matchMedia('(min-width: 1101px)').matches && !panel.open) {
-    panel.open = true;
-  }
+  // Default load state: collapsed/hidden (desktop + mobile).
+  panel.open = false;
 
-  const sync = () => setSettingsPanelState(panel.open);
+  const sync = () => {
+    setSettingsPanelState(panel.open);
+    scheduleMonitorRenderSync();
+  };
   panel.addEventListener('toggle', sync);
   window.addEventListener('resize', sync);
   sync();
@@ -1782,6 +2158,7 @@ function setSettingsPanelState(isOpen) {
     const label = btn.querySelector('.btn-settings-label');
     if (label) label.textContent = (isOpen && desktop) ? 'Hide Settings' : 'Settings';
   }
+  scheduleMonitorRenderSync();
 }
 
 function toggleSettingsPanel() {

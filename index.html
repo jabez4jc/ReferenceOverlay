@@ -67,9 +67,9 @@
 
     <!-- ── Bible Reference Panel ──────────────────────────────────────────── -->
     <section id="panel-bible" class="panel">
-      <div class="field-grid">
+      <div class="field-grid bible-grid">
 
-        <div class="field-group span-2">
+        <div class="field-group bible-book">
           <label for="book">Book</label>
           <select id="book" onchange="onBookChange()">
             <optgroup label="Old Testament" id="optgroup-ot"></optgroup>
@@ -77,12 +77,12 @@
           </select>
         </div>
 
-        <div class="field-group">
+        <div class="field-group bible-chapter">
           <label for="chapter">Chapter</label>
           <select id="chapter" onchange="onBibleChange()"></select>
         </div>
 
-        <div class="field-group span-full">
+        <div class="field-group bible-verse">
           <label for="verse-ref">
             Verse(s)
             <span class="label-hint">e.g. 19 &nbsp;·&nbsp; 19-21 &nbsp;·&nbsp; 19, 22 &nbsp;·&nbsp; 19-21, 25</span>
@@ -92,17 +92,24 @@
           <div id="verse-validation" class="verse-validation"></div>
         </div>
 
-        <div class="field-group span-2">
+        <div class="field-group bible-translation">
           <label for="translation">Translation</label>
           <select id="translation" onchange="onBibleChange()"></select>
-          <label class="verse-text-include" style="margin-top:6px;">
-            <input type="checkbox" id="hide-translation-line2" checked onchange="updatePreview()" />
-            Hide translation line (Line 2)
-          </label>
         </div>
-        <div class="field-group">
+        <div class="field-group bible-ref-lang">
           <label for="reference-language">Reference Language</label>
           <select id="reference-language" onchange="onReferenceLanguageChange()"></select>
+        </div>
+
+        <div class="field-group span-full bible-line-options">
+          <label class="verse-text-include">
+            <input type="checkbox" id="hide-translation-line2" checked onchange="onBibleLineOptionsChange()" />
+            Hide translation line (Line 2)
+          </label>
+          <label class="verse-text-include">
+            <input type="checkbox" id="append-translation-abbr-line1" onchange="onBibleLineOptionsChange()" />
+            Append translation abbreviation on line 1
+          </label>
         </div>
 
         <!-- ── Verse Text Lookup ─────────────────────────────────────────── -->
@@ -118,7 +125,7 @@
             <p id="verse-text-content" class="verse-text-content"></p>
             <span id="verse-ref-note" class="verse-ref-note" style="display:none">Verification only — ASV (not sent to output)</span>
             <label class="verse-text-include">
-              <input type="checkbox" id="include-verse-text" onchange="updatePreview()" />
+              <input type="checkbox" id="include-verse-text" onchange="onBibleLineOptionsChange()" />
               Use verse text as line 2 in output
             </label>
           </div>
@@ -129,16 +136,16 @@
 
     <!-- ── Speaker Panel ──────────────────────────────────────────────────── -->
     <section id="panel-speaker" class="panel hidden">
-      <div class="field-grid">
+      <div class="field-grid speaker-grid">
 
-        <div class="field-group span-full">
+        <div class="field-group speaker-name">
           <label for="speaker-name">Speaker Name</label>
           <input type="text" id="speaker-name"
                  placeholder="e.g. Suresh Abraham"
                  onchange="onSpeakerChange()" oninput="onSpeakerChange()" />
         </div>
 
-        <div class="field-group span-full">
+        <div class="field-group speaker-title">
           <label for="speaker-title">
             Title / Role
             <span class="label-hint">optional</span>
@@ -153,7 +160,7 @@
 
     <!-- ── Ticker Panel ───────────────────────────────────────────────────── -->
     <section id="panel-ticker" class="panel hidden">
-      <div class="ticker-panel-grid">
+      <div class="ticker-panel-grid ticker-grid">
 
         <div class="field-group span-full">
           <label for="ticker-message">
@@ -163,17 +170,17 @@
           <textarea id="ticker-message" rows="3"
             style="width:100%;padding:9px 12px;background:var(--surface-2);border:1px solid var(--border);border-radius:4px;color:var(--text);font-family:var(--font);font-size:.95rem;resize:vertical;"
             placeholder="e.g. ⚠ Emergency service cancelled — please check the foyer for updates"
-            oninput="onTickerChange()">The Live Stream has been restored.— Thank you for your patience, and our sincere apologies for the interruption.</textarea>
+            oninput="onTickerChange()">The Live Stream has been restored. Thank you for your patience, and our sincere apologies for the interruption.</textarea>
         </div>
 
-        <div class="field-group">
+        <div class="field-group ticker-badge">
           <label for="ticker-label">Badge Label</label>
           <input type="text" id="ticker-label" value="INFO"
                  placeholder="INFO"
                  oninput="onTickerChange()" onchange="onTickerChange()" />
         </div>
 
-        <div class="field-group">
+        <div class="field-group ticker-speed">
           <label for="ticker-speed">Scroll Speed</label>
           <select id="ticker-speed" onchange="onTickerChange()">
             <option value="80">Slow</option>
@@ -183,18 +190,18 @@
           </select>
         </div>
 
-        <div class="field-group">
+        <div class="field-group ticker-style">
           <label for="ticker-style">Style</label>
           <select id="ticker-style" onchange="onTickerStyleChange()">
             <option value="alert">Alert (red)</option>
-            <option value="info" selected>Info (blue)</option>
+            <option value="info">Info (blue)</option>
             <option value="warning">Warning (amber)</option>
-            <option value="dark">Dark</option>
+            <option value="dark" selected>Dark</option>
             <option value="custom">Custom colors…</option>
           </select>
         </div>
 
-        <div class="field-group">
+        <div class="field-group ticker-position">
           <label for="ticker-position">Position</label>
           <select id="ticker-position" onchange="onTickerChange()">
             <option value="bottom" selected>Bottom</option>
@@ -316,6 +323,20 @@
       <!-- Ticker presets (hidden when not in ticker mode) -->
       <div class="presets-list" id="presets-list-ticker" style="display:none">
         <span class="presets-empty" id="presets-empty-ticker">No ticker presets saved — click Save Current to add one</span>
+      </div>
+
+      <div class="settings-profiles">
+        <div class="settings-profiles-label">Settings Profiles</div>
+        <div class="settings-profiles-row">
+          <select id="settings-profile-select" class="settings-profiles-select">
+            <option value="">No settings profiles yet</option>
+          </select>
+          <button class="btn-preset-io" onclick="saveSettingsProfile()" title="Save full session settings + all presets as a global profile">Save Profile</button>
+          <button class="btn-preset-io" onclick="loadSelectedSettingsProfile()" title="Load selected profile into this session">Load</button>
+          <button class="btn-preset-io" onclick="deleteSelectedSettingsProfile()" title="Delete selected settings profile">Delete</button>
+          <button class="btn-preset-io" onclick="exportSettingsProfiles()" title="Export all settings profiles to JSON">Export</button>
+          <button class="btn-preset-io" onclick="importSettingsProfiles()" title="Import settings profiles from JSON">Import</button>
+        </div>
       </div>
     </section>
 
