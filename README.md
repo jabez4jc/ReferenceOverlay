@@ -8,6 +8,9 @@ Use it to drive an output overlay for:
 
 It is designed for OBS, vMix, Wirecast, and browser-based output workflows.
 
+> “Freely you have received; freely give.”  
+> - Matthew 10:8
+
 ## Live Demo
 
 Try it here: `https://overlay.simplifyed.in`
@@ -237,3 +240,11 @@ Add screenshots to `assets/screenshots/` and update paths as needed.
 
 - Node.js `>=16` required.
 - For cross-device control and Browser Source sync, run through `server.js` (HTTP), not `file://`.
+
+## Copyright and License
+
+- Copyright © 2026 **Jabez Vettriselvan**
+- License: `AGPL-3.0-only` (see `LICENSE`)
+- Ownership: License and copyright are owned by **Jabez Vettriselvan**.
+- This application must always remain free software.
+- Modified/redistributed/hosted versions must remain under `AGPL-3.0-only`.

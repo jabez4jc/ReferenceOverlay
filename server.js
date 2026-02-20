@@ -397,5 +397,7 @@ function printBanner() {
   });
   console.log('\n  Open the Network URL on any device on the same Wi-Fi.');
   console.log('  Each browser tab gets its own session (?session=...).');
+  console.log('  Copyright © 2026 Jabez Vettriselvan.');
+  console.log('  “Freely you have received; freely give.” — Matthew 10:8');
   console.log('  Press Ctrl+C to stop.\n');
 }

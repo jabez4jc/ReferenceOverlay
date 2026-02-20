@@ -1656,6 +1656,25 @@ input[type="color"] {
   color: var(--text-dim);
 }
 
+.app-attribution {
+  text-align: center;
+  font-size: .72rem;
+  color: rgba(232, 234, 246, 0.55);
+  letter-spacing: .02em;
+  padding: 6px 0 2px;
+}
+.app-attribution a {
+  color: rgba(232, 234, 246, 0.8);
+  text-decoration: underline;
+  text-underline-offset: 2px;
+}
+.app-attribution a:hover {
+  color: var(--accent);
+}
+.app-attribution-verse {
+  margin-left: 6px;
+}
+
 kbd {
   display: inline-block;
   padding: 1px 6px;
@@ -1693,6 +1712,12 @@ kbd {
   .panel { padding: 12px; }
   .presets-section { padding: 8px 12px 2px; }
   .kbd-hint { font-size: .68rem; }
+  .app-attribution { font-size: .64rem; padding-top: 4px; }
+  .app-attribution-verse {
+    display: block;
+    margin-left: 0;
+    margin-top: 2px;
+  }
 
   /* Keep monitors side-by-side and shorter on small phones */
   .monitors-section { grid-template-columns: 1fr 1fr; gap: 6px; }
