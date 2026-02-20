@@ -2153,10 +2153,10 @@ function setSettingsPanelState(isOpen) {
   const btn = document.getElementById('btn-settings-toggle');
   if (main) main.classList.toggle('settings-open', !!isOpen && desktop);
   if (btn) {
-    btn.classList.toggle('active', !!isOpen && desktop);
-    btn.setAttribute('aria-expanded', (isOpen && desktop) ? 'true' : 'false');
+    btn.classList.toggle('active', !!isOpen);
+    btn.setAttribute('aria-expanded', isOpen ? 'true' : 'false');
     const label = btn.querySelector('.btn-settings-label');
-    if (label) label.textContent = (isOpen && desktop) ? 'Hide Settings' : 'Settings';
+    if (label) label.textContent = isOpen ? 'Hide Settings' : 'Settings';
   }
   scheduleMonitorRenderSync();
 }

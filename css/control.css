@@ -1768,7 +1768,6 @@ kbd {
 
 @media (max-width: 1100px) {
   .app { max-width: 760px; }
-  .btn-settings-toggle { display: none; }
   .app-main {
     display: flex;
     flex-direction: column;
