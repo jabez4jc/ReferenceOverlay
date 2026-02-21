@@ -11,7 +11,7 @@ if ! command -v apt-get >/dev/null 2>&1; then
   exit 1
 fi
 
-REPO_URL="https://github.com/jabez4jc/Overlay.git"
+REPO_URL="https://github.com/jabez4jc/Overlay"
 BRANCH="main"
 APP_DIR="/opt/overlay"
 

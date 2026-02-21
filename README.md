@@ -1,7 +1,6 @@
 # Overlay
 
-Overlay is a browser-based lower-third control application for live production.
-It supports Bible references, speaker overlays, and ticker messages with live PVW/PGM workflow.
+Overlay is a browser-based lower-third control system for live production with synchronized **Control / PVW / PGM / Output** pipelines, multi-session operation, and ATEM-ready PNG export.
 
 Live demo: `https://overlay.simplifyed.in`
 
@@ -10,24 +9,23 @@ Live demo: `https://overlay.simplifyed.in`
 
 ## Quick Start
 
-1. Install dependencies:
 ```bash
 npm install
-```
-2. Start server:
-```bash
 npm start
 ```
-3. Open:
-- Control: `http://localhost:3333/`
-- Output: `http://localhost:3333/output.html?session=<session-id>`
 
-## Core Workflow
+Open:
+- Control UI: `http://localhost:3333/`
+- Output window: `http://localhost:3333/output.html?session=<session-id>`
+
+Use the **same session ID** in both windows.
+
+## Core Live Workflow
 
 1. Select mode: `Bible Reference`, `Speaker`, or `Ticker`.
-2. Enter content and verify in `PVW`.
-3. Click `CUT TO AIR` to send to `PGM` and output.
-4. Click `CLEAR` to remove live output.
+2. Build and validate content in `PVW`.
+3. Click `CUT TO AIR` to move PVW to `PGM` and Output.
+4. Click `CLEAR` to remove active lower-third/ticker output.
 
 Keyboard shortcuts:
 - `Enter`: Cut to Air
@@ -38,58 +36,126 @@ Keyboard shortcuts:
 - `O`: Open Output Window
 - `H`: Open User Guide
 
-## In-App User Guide
+## Session Model
 
-A detailed user guide is now available inside the app:
-- Click `User Guide` in the top-right header.
-- It includes setup, operating flows, style controls, ATEM usage, and troubleshooting.
+- Every session is isolated via URL: `?session=<id>`.
+- Control and Output must share session ID.
+- You can run multiple sessions from one server at the same time.
+- You can set a custom session at load time (URL/session switcher).
 
-## Features
+## Mode Workflows
 
-- Bible lookup with free-source fallback support.
-- Multi-session operation via `?session=<id>`.
-- PVW/PGM monitoring with CUT/CLEAR workflow.
-- Lower-third style library including scripture/high-capacity and modern inline variants.
-- Per-line text effects:
-  - independent fonts for line 1 and line 2
-  - supported font weights
-  - italic
-  - font scaling
-  - custom colors
-  - stroke and drop shadow
-- Custom HTML/CSS template mode.
-- Custom lower-third image background and transparent logo support.
-- Presets and profiles:
-  - Reference presets
-  - Speaker presets
-  - Ticker presets
-  - Template presets
-  - Global Settings Profiles (Save/Load/Export/Import)
+### Bible Reference
 
-## Output Setup (OBS/vMix/Wirecast)
+- Set `Book`, `Chapter`, `Verse(s)`, `Translation`, and `Reference Language`.
+- Optional toggles:
+  - `Hide translation line (Line 2)`
+  - `Append translation abbreviation on line 1`
+- `Look Up Text` fetches verse text (using configured source/fallback chain).
+- `Use verse text as line 2 in output` is intentionally independent from translation visibility.
 
-Use `Settings -> Output Setup -> Browser Source`:
-1. Copy `Output URL`.
-2. Add as Browser Source in OBS/vMix/Wirecast.
-3. Match source resolution to selected output resolution.
+Recommended runbook:
+1. Build reference.
+2. Optionally fetch verse text.
+3. Confirm line 1/line 2 behavior.
+4. Check PVW.
+5. Cut to air.
+
+### Speaker
+
+- Enter speaker name (required for meaningful on-air output).
+- Role/title is optional.
+- Preview first, then cut.
+
+### Ticker
+
+- Set message, badge, speed, style, position, colors, and size.
+- Ticker can be operated independently from lower-third overlays.
+
+## Styling System
+
+### Lower Third Styles
+
+- Includes classic, gradient, scripture/high-capacity, and modern inline variants.
+- Supports line-1-only and line-1+line-2 workflows.
+- Line 2 multiline can be enabled for longer scripture text.
+
+### Text Effects (Per Line)
+
+Each line (Line 1 / Line 2) supports:
+- Font family
+- Supported font weight (filtered by selected font)
+- Italic
+- Font size scale
+- Custom color
+- Stroke (toggle + color + width)
+- Drop shadow (toggle + direction/depth/blur/opacity/color)
+
+### Custom Template and Assets
+
+- `Custom HTML Template` can fully override built-in styles.
+- Supported variables: `{{line1}}`, `{{line2}}`, `{{accentColor}}`, `{{font}}`, `{{line1Font}}`, `{{line2Font}}`, `{{logoUrl}}`, `{{bgUrl}}`.
+- `Custom Image & Logo` supports:
+  - Lower-third background image
+  - PNG logo with transparency
+
+## Presets and Settings Profiles
+
+### Presets
+
+- Reference presets
+- Speaker presets
+- Ticker presets
+- Template presets
+
+### Settings Profiles
+
+Global Save/Load/Export/Import for:
+- Visual settings
+- Layout options
+- Mode defaults
+- Presets bundle
+
+Use profiles for rapid show setup reuse across sessions/devices.
+
+## Output Setup
+
+`Settings -> Output Setup`
+
+### Browser Source Tab
+
+Use this when integrating with OBS/vMix/Wirecast:
+1. Copy Output URL.
+2. Add as Browser Source.
+3. Match source resolution with selected output resolution.
 4. Choose keying method:
-- `Transparent` chroma mode for alpha browser workflows.
-- Blue/Green/Magenta for chroma-key workflows.
+   - `Transparent` mode for alpha-capable browser pipelines.
+   - Blue/Green/Magenta/Custom for chroma-key pipelines.
 
-## ATEM PNG Export
+### ATEM PNG Export Tab
 
-Use `Settings -> Output Setup -> ATEM PNG Export`.
+Use this when feeding ATEM media workflow.
 
-- `ATEM PNG URL (Premultiplied)`
-  - For ATEM media/key workflows that expect premultiplied alpha.
-- `Preview PNG URL (Straight)`
-  - For browser visual comparison with output rendering.
-- `Regenerate`
-  - Forces immediate PNG render.
+- Include/pin current session for export.
+- Session-specific URLs are provided.
+- Export endpoints support both alpha models:
+  - Premultiplied (ATEM production use)
+  - Straight (browser QA/comparison)
 
-Additional URL variants:
+Typical endpoints:
+- `/atem-live.png` (default export)
+- `/atem-live/<session>.png`
 - `/atem-live/<session>.png?alpha=premultiplied`
 - `/atem-live/<session>.png?alpha=straight`
+
+Recommended ATEM runbook:
+1. Pin the active session.
+2. Cut lower-third to air.
+3. Regenerate if you need immediate refresh.
+4. Use premultiplied URL for ATEM key workflow.
+5. If mismatch is suspected, compare straight variant first in browser.
+
+Note: premultiplied images can look visually different in standard browser preview; validate in the target switcher/key pipeline.
 
 ## Defaults
 
@@ -98,51 +164,65 @@ Additional URL variants:
 - `Hide translation line (Line 2)`: enabled by default
 - `Use verse text as line 2`: disabled by default
 - Default ticker style: `Dark`
-- Default ticker text:
-  - `The Live Stream has been restored. Thank you for your patience, and our sincere apologies for the interruption.`
-- Settings panel starts collapsed.
+- Default ticker text:  
+  `The Live Stream has been restored. Thank you for your patience, and our sincere apologies for the interruption.`
+- Settings panel default: collapsed/hidden for faster operation
 
-## Deploy on Ubuntu (Automated)
+## Deploy
 
-### One-command bootstrap
+### Ubuntu (Automated)
+
 ```bash
 curl -fsSL https://raw.githubusercontent.com/jabez4jc/Overlay/main/scripts/bootstrap_ubuntu_server.sh | sudo bash
 ```
 
-### What it does
-- Updates server packages
-- Installs `git` and `curl`
-- Clones/updates repo in `/opt/overlay`
-- Runs installer script for Node/systemd/Nginx/HTTPS
+This bootstrap updates the server, installs required tools, clones/updates repo, and runs the full installer (Node, service, Nginx, HTTPS).
 
-### Manual path
+Manual path:
+
 ```bash
 sudo apt-get update -y && sudo apt-get upgrade -y
 sudo apt-get install -y git curl ca-certificates
-sudo git clone https://github.com/jabez4jc/Overlay.git /opt/overlay
+sudo git clone https://github.com/jabez4jc/Overlay /opt/overlay
 cd /opt/overlay
 sudo bash scripts/install_ubuntu_server.sh
 ```
 
-## Deploy on Coolify
+### Coolify
 
 - Repo: `https://github.com/jabez4jc/Overlay`
 - Branch: `main`
-- Build Pack: `Nixpacks (Node)`
-- Install command: `npm ci` (or `npm install`)
-- Start command: `npm start`
+- Build: Nixpacks Node
+- Install: `npm ci` (or `npm install`)
+- Start: `npm start`
 - Port: `3333`
+
+## Troubleshooting
+
+- Output not syncing:
+  - Confirm same session ID in Control and Output URLs.
+  - Confirm active WebSocket connection.
+- PVW/PGM vs Output mismatch:
+  - Verify mode and active cut state.
+  - Confirm custom template is not overriding expected style.
+- ATEM PNG mismatch:
+  - Regenerate export.
+  - Compare `?alpha=straight` vs `?alpha=premultiplied`.
+  - Validate with actual ATEM key settings.
+- Mobile UX issues:
+  - Keep settings collapsed unless editing.
+  - Use User Guide (`H`) for fast-operate workflow.
 
 ## Project Structure
 
 - `index.html` - Control UI
 - `output.html` - Output renderer
-- `js/control.js` - Control logic, presets/profiles, sync
-- `js/output.js` - Output render logic
-- `js/data.js` - Bible/language/font data
-- `css/control.css` - Control UI styles
-- `css/output.css` - Output styles
-- `server.js` - HTTP/WebSocket server + ATEM PNG export
+- `js/control.js` - control logic, sync, presets/profiles
+- `js/output.js` - output rendering logic
+- `js/data.js` - Bible data, translation/font metadata
+- `css/control.css` - control styles
+- `css/output.css` - output styles
+- `server.js` - HTTP/WebSocket + ATEM PNG export pipeline
 - `scripts/bootstrap_ubuntu_server.sh` - Ubuntu bootstrap
 - `scripts/install_ubuntu_server.sh` - Ubuntu installer
 
@@ -150,4 +230,4 @@ sudo bash scripts/install_ubuntu_server.sh
 
 - Copyright © 2026 **Jabez Vettriselvan**
 - License: **AGPL-3.0-only**
-- This project must remain free software under AGPL-3.0-only.
+- This project remains free software under AGPL-3.0-only.

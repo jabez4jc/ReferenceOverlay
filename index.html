@@ -1096,94 +1096,125 @@
     </div>
     <div class="guide-body">
       <section class="guide-section">
-        <h3>1. Getting Started</h3>
+        <h3>1. Session Setup and Pairing</h3>
         <ol>
-          <li>Open the control panel at <code>/</code> and output window at <code>/output.html?session=&lt;id&gt;</code>.</li>
-          <li>Use the same session ID in control and output.</li>
-          <li>Pick a chroma mode in Settings: <code>Transparent</code> for browser-alpha workflows, or Blue/Green/Magenta for keyed workflows.</li>
+          <li>Open Control UI at <code>/</code>.</li>
+          <li>Open Output at <code>/output.html?session=&lt;id&gt;</code>.</li>
+          <li>Keep the same session ID in all windows/devices for that production lane.</li>
+          <li>Use one session per independent output pipeline.</li>
         </ol>
       </section>
 
       <section class="guide-section">
-        <h3>2. Live Operation Flow</h3>
+        <h3>2. Live Operation Runbook</h3>
         <ol>
           <li>Select mode: <code>Bible</code>, <code>Speaker</code>, or <code>Ticker</code>.</li>
-          <li>Set text/data and verify in <code>PVW</code>.</li>
-          <li>Click <code>CUT TO AIR</code> to push to <code>PGM</code> and output.</li>
-          <li>Click <code>CLEAR</code> to remove from air.</li>
+          <li>Build content and verify in <code>PVW</code>.</li>
+          <li>Press <code>CUT TO AIR</code> to push to <code>PGM</code> and Output.</li>
+          <li>Press <code>CLEAR</code> to remove active lower-third/ticker output.</li>
         </ol>
+        <p>Always treat PVW as final QA before every cut.</p>
       </section>
 
       <section class="guide-section">
-        <h3>3. Bible Mode</h3>
-        <ul>
-          <li>Choose Book, Chapter, Verse(s), Translation, and Reference Language.</li>
-          <li><code>Hide translation line (Line 2)</code> controls whether line 2 shows translation text.</li>
-          <li><code>Look Up Text</code> fetches verse text; <code>Use verse text as line 2</code> uses passage text in output line 2.</li>
-          <li><code>Append translation abbreviation on line 1</code> adds short code like <code>(NASB)</code>.</li>
-        </ul>
+        <h3>3. Bible Mode (Recommended Flow)</h3>
+        <ol>
+          <li>Choose Book / Chapter / Verse(s).</li>
+          <li>Select translation and reference language.</li>
+          <li>Set line behavior:
+            <ul>
+              <li><code>Hide translation line (Line 2)</code></li>
+              <li><code>Append translation abbreviation on line 1</code></li>
+            </ul>
+          </li>
+          <li>Optional: click <code>Look Up Text</code>.</li>
+          <li>Enable <code>Use verse text as line 2 in output</code> only when you want passage text on-air.</li>
+          <li>Check PVW and cut to air.</li>
+        </ol>
       </section>
 
       <section class="guide-section">
         <h3>4. Speaker and Ticker</h3>
         <ul>
-          <li>Speaker: Enter speaker name and optional title/role.</li>
-          <li>Ticker: Set message, badge label, speed, style, position, and size controls.</li>
-          <li>Ticker runs independently and can stay on air while overlays are cleared.</li>
+          <li>Speaker: speaker name is primary; role/title is optional.</li>
+          <li>Ticker: configure message, badge, style, speed, position, and colors.</li>
+          <li>Ticker can be run independently from lower-thirds.</li>
         </ul>
       </section>
 
       <section class="guide-section">
-        <h3>5. Styling and Templates</h3>
+        <h3>5. Styles, Text Effects, and Templates</h3>
         <ul>
-          <li><code>Lower Third Style</code> selects built-in looks (classic, gradient, scripture, inline styles, etc.).</li>
-          <li><code>Text Effects (Per Line)</code> lets you control font, weight, size, custom color, stroke, and shadow for each line.</li>
+          <li><code>Lower Third Style</code> controls layout family and base visual style.</li>
+          <li><code>Text Effects (Per Line)</code> controls line-specific font, weight, size, color, stroke, and drop shadow.</li>
+          <li>Use Line 2 multiline for long scripture passages.</li>
           <li><code>Custom HTML Template</code> overrides built-in styles completely.</li>
-          <li><code>Custom Image &amp; Logo</code> lets you set bar background image and transparent logos.</li>
+          <li>Template variables: <code>{{line1}}</code>, <code>{{line2}}</code>, <code>{{accentColor}}</code>, <code>{{line1Font}}</code>, <code>{{line2Font}}</code>, <code>{{logoUrl}}</code>, <code>{{bgUrl}}</code>.</li>
         </ul>
       </section>
 
       <section class="guide-section">
-        <h3>6. Presets and Profiles</h3>
+        <h3>6. Presets and Settings Profiles</h3>
         <ul>
-          <li>Use <code>Save</code> in presets to store Bible/Speaker/Ticker entries.</li>
-          <li><code>Settings Profiles</code> save and restore full session settings globally.</li>
-          <li>Use <code>Export</code>/<code>Import</code> to move presets and profiles between machines.</li>
+          <li>Presets speed up content recall (Reference/Speaker/Ticker/Template).</li>
+          <li>Settings Profiles store full operational state and presets together.</li>
+          <li>Use Export/Import for transfer between machines/servers.</li>
         </ul>
       </section>
 
       <section class="guide-section">
-        <h3>7. Output Setup and ATEM PNG</h3>
-        <ul>
-          <li><strong>Browser Source tab:</strong> use the output URL in OBS/vMix/Wirecast browser source.</li>
-          <li><strong>ATEM PNG Export tab:</strong>
+        <h3>7. Output Setup: Browser Source</h3>
+        <ol>
+          <li>Open <code>Settings → Output Setup → Browser Source</code>.</li>
+          <li>Copy Output URL and add it as a browser source in OBS/vMix/Wirecast.</li>
+          <li>Match source resolution to selected output resolution.</li>
+          <li>For alpha pipelines use <code>Transparent</code> mode and enable transparency in the switcher software.</li>
+          <li>For chroma workflows use Blue/Green/Magenta/Custom and key that color downstream.</li>
+        </ol>
+      </section>
+
+      <section class="guide-section">
+        <h3>8. Output Setup: ATEM PNG Export</h3>
+        <ol>
+          <li>Open <code>Settings → Output Setup → ATEM PNG Export</code>.</li>
+          <li>Include/pin the current session for ATEM export.</li>
+          <li>Use session PNG endpoints:
             <ul>
-              <li><code>ATEM PNG URL (Premultiplied)</code> is for ATEM media workflows.</li>
-              <li><code>Preview PNG URL (Straight)</code> is for browser visual comparison.</li>
-              <li><code>Regenerate</code> forces immediate PNG re-render.</li>
+              <li><code>/atem-live/&lt;session&gt;.png?alpha=premultiplied</code> for ATEM production use.</li>
+              <li><code>/atem-live/&lt;session&gt;.png?alpha=straight</code> for browser QA/comparison.</li>
             </ul>
           </li>
+          <li>Use <code>Regenerate</code> if immediate refresh is required.</li>
+          <li>If preview mismatch appears, compare straight and premultiplied outputs first.</li>
+        </ol>
+      </section>
+
+      <section class="guide-section">
+        <h3>9. Multi-Session Best Practices</h3>
+        <ul>
+          <li>Keep each operator/program lane on its own session ID.</li>
+          <li>Pin only sessions that must publish ATEM PNG outputs.</li>
+          <li>Avoid sharing one session across unrelated productions.</li>
         </ul>
       </section>
 
       <section class="guide-section">
-        <h3>8. Keyboard Shortcuts</h3>
-        <p><code>Enter</code> Cut to Air, <code>Esc</code> Clear, <code>B</code> Bible, <code>S</code> Speaker, <code>T</code> Ticker, <code>O</code> Output Window.</p>
+        <h3>10. Keyboard and Fast Operations</h3>
+        <p><code>Enter</code> Cut, <code>Esc</code> Clear, <code>B</code> Bible, <code>S</code> Speaker, <code>T</code> Ticker, <code>O</code> Output Window, <code>H</code> User Guide.</p>
       </section>
 
       <section class="guide-section">
-        <h3>9. Quick Troubleshooting</h3>
+        <h3>11. Troubleshooting</h3>
         <ul>
-          <li>If output does not update, verify session IDs match and WebSocket indicator is online.</li>
-          <li>If text looks different in PNG preview, compare using <code>?alpha=straight</code>.</li>
-          <li>If settings feel cramped, keep sections collapsed and open only the active subsection.</li>
+          <li>No live sync: verify matching session ID and active WebSocket connection.</li>
+          <li>Output differs from PVW/PGM: check active mode, cut state, and template override.</li>
+          <li>ATEM PNG differs from output: regenerate and compare straight vs premultiplied variants.</li>
+          <li>Layout issues on small screens: keep settings collapsed while operating live.</li>
         </ul>
       </section>
     </div>
   </div>
 </div>
-
-
 <script src="js/data.js"></script>
 <script src="js/control.js"></script>
 </body>

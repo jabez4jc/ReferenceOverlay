@@ -14,7 +14,7 @@ fi
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 REPO_ROOT="$(cd "${SCRIPT_DIR}/.." && pwd)"
 
-DEFAULT_REPO_URL="https://github.com/jabez4jc/Overlay.git"
+DEFAULT_REPO_URL="https://github.com/jabez4jc/Overlay"
 REPO_URL="${DEFAULT_REPO_URL}"
 BRANCH="main"
 
