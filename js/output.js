@@ -58,6 +58,68 @@ function hexToRgba(hex, alpha) {
   return `rgba(${r},${g},${b},${a})`;
 }
 
+
+const INLINE_LOWER_THIRD_STYLES = new Set(['inline-duo', 'inline-chip', 'inline-glass']);
+const LOWER_THIRD_STYLE_CLASSNAMES = [
+  'style-classic', 'style-accent', 'style-minimal', 'style-outline',
+  'style-gradient', 'style-scripture', 'style-scripture-panel',
+  'style-solid', 'style-split', 'style-frosted',
+  'style-inline-duo', 'style-inline-chip', 'style-inline-glass',
+];
+const LOWER_THIRD_BACKGROUND_MODE = Object.freeze({
+  classic: 'custom-solid',
+  accent: 'transparent',
+  minimal: 'transparent',
+  outline: 'transparent',
+  gradient: 'custom-gradient',
+  scripture: 'custom-gradient',
+  'scripture-panel': 'custom-solid',
+  solid: 'style-defined',
+  split: 'custom-solid',
+  frosted: 'custom-solid',
+  'inline-duo': 'custom-solid',
+  'inline-chip': 'custom-solid',
+  'inline-glass': 'custom-gradient',
+});
+
+function getLowerThirdBackgroundMode(style) {
+  return LOWER_THIRD_BACKGROUND_MODE[style] || 'custom-solid';
+}
+
+function isInlineLowerThirdStyle(style) {
+  return INLINE_LOWER_THIRD_STYLES.has(style);
+}
+
+function applyStyleAwareLowerThirdBackground(ltTextEl, settings) {
+  if (!ltTextEl || !settings) return;
+  const style = settings.style || 'gradient';
+  const bgColor = settings.ltBgColor || '#000000';
+  const bgOpacity = Math.max(0, Math.min(1, parseFloat(settings.ltBgOpacity ?? 0.88)));
+  const mode = getLowerThirdBackgroundMode(style);
+
+  ltTextEl.style.background = '';
+
+  if (mode === 'transparent') {
+    ltTextEl.style.background = 'transparent';
+    return;
+  }
+
+  if (mode === 'custom-gradient') {
+    const start = hexToRgba(bgColor, Math.max(0, Math.min(1, bgOpacity * 1.05)));
+    const mid = hexToRgba(bgColor, Math.max(0, Math.min(1, bgOpacity * 0.72)));
+    const end = hexToRgba(bgColor, 0);
+    ltTextEl.style.background = `linear-gradient(90deg, ${start} 0%, ${mid} 62%, ${end} 100%)`;
+    return;
+  }
+
+  if (mode === 'custom-solid') {
+    ltTextEl.style.background = hexToRgba(bgColor, bgOpacity);
+    return;
+  }
+
+  // style-defined: preserve CSS-defined background for the selected style.
+}
+
 function getLineTextEffect(s, key) {
   return { ...DEFAULT_TEXT_EFFECTS[key], ...(s?.textEffects?.[key] || {}) };
 }
@@ -182,10 +244,10 @@ function showOverlay(data) {
     ltLine2.textContent   = data.line2 || '';
     if (!data.line2) {
       ltLine2.style.display = 'none';
-    } else if (currentSettings?.line2Multiline) {
-      ltLine2.style.display = '-webkit-box';
     } else {
-      ltLine2.style.display = '';
+      const inlineStyle = isInlineLowerThirdStyle(currentSettings?.style || 'gradient');
+      const multiline = !!currentSettings?.line2Multiline && !inlineStyle;
+      ltLine2.style.display = multiline ? '-webkit-box' : 'block';
     }
     ltRoot.classList.remove('visible');
     void ltRoot.offsetWidth;
@@ -285,9 +347,7 @@ function applySettings(s) {
   ltWrap.classList.add('anim-' + (s.animation || 'fade'));
 
   // ── Lower third style ──────────────────────────────────────────────────────
-  ltRoot.classList.remove('style-classic', 'style-accent', 'style-minimal', 'style-outline',
-                          'style-gradient', 'style-scripture', 'style-scripture-panel',
-                          'style-solid', 'style-split', 'style-frosted');
+  ltRoot.classList.remove(...LOWER_THIRD_STYLE_CLASSNAMES);
   ltRoot.classList.add('style-' + (s.style || 'gradient'));
 
   // ── Accent colour ─────────────────────────────────────────────────────────
@@ -321,10 +381,8 @@ function applySettings(s) {
   }
   applyLineTextEffects(s);
 
-  const ltBgColor = s.ltBgColor || '#000000';
-  const ltBgOpacity = Math.max(0, Math.min(1, parseFloat(s.ltBgOpacity ?? 0.88)));
   if (ltText) {
-    ltText.style.background = hexToRgba(ltBgColor, ltBgOpacity);
+    applyStyleAwareLowerThirdBackground(ltText, s);
   }
   const ltWidth = Math.max(40, Math.min(100, parseInt(s.ltWidth || 100, 10)));
   if (ltRoot) {
@@ -332,12 +390,14 @@ function applySettings(s) {
     ltRoot.style.maxWidth = '100%';
   }
   if (ltLine2) {
-    const multiline = !!s.line2Multiline;
+    const inlineStyle = isInlineLowerThirdStyle(s.style || 'gradient');
+    const multiline = !!s.line2Multiline && !inlineStyle;
     const maxLines = Math.max(1, Math.min(6, parseInt(s.line2MaxLines || 2, 10)));
+    const hasLine2 = !!(ltLine2.textContent || '').trim();
     ltLine2.style.whiteSpace = multiline ? 'normal' : 'nowrap';
     ltLine2.style.overflow = 'hidden';
     ltLine2.style.textOverflow = multiline ? 'clip' : 'ellipsis';
-    ltLine2.style.display = multiline && (ltLine2.textContent || '').trim() ? '-webkit-box' : '';
+    ltLine2.style.display = !hasLine2 ? 'none' : (multiline ? '-webkit-box' : 'block');
     ltLine2.style.webkitBoxOrient = multiline ? 'vertical' : '';
     ltLine2.style.webkitLineClamp = multiline ? String(maxLines) : '';
     ltLine2.style.lineClamp = multiline ? String(maxLines) : '';

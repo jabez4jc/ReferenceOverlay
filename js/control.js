@@ -8,14 +8,43 @@
 // Each browser tab gets its own session ID so multiple operators can run
 // independent control panels with isolated output windows simultaneously.
 // The ID is stored in the URL (?session=...) so it survives page reloads.
+function sanitizeSessionId(value) {
+  return String(value || '')
+    .trim()
+    .replace(/\s+/g, '-')
+    .replace(/[^a-zA-Z0-9_-]/g, '')
+    .slice(0, 40);
+}
+
+function makeRandomSessionId() {
+  return Math.random().toString(36).slice(2, 9);
+}
+
 function getOrCreateSessionId() {
   const params = new URLSearchParams(location.search);
-  let id = params.get('session');
+  const remembered = (() => {
+    try { return sanitizeSessionId(localStorage.getItem('overlayLastSessionId')); } catch (_) { return ''; }
+  })();
+
+  let id = sanitizeSessionId(params.get('session'));
   if (!id) {
-    id = Math.random().toString(36).slice(2, 9);
-    params.set('session', id);
-    history.replaceState({}, '', '?' + params.toString());
+    const suggested = remembered || makeRandomSessionId();
+    let entered = '';
+    while (!entered) {
+      const input = window.prompt('Enter Session ID (letters, numbers, - or _)', suggested);
+      if (input === null) {
+        entered = suggested;
+        break;
+      }
+      entered = sanitizeSessionId(input);
+      if (!entered) window.alert('Please enter a valid Session ID.');
+    }
+    id = entered;
   }
+
+  params.set('session', id);
+  history.replaceState({}, '', '?' + params.toString());
+  try { localStorage.setItem('overlayLastSessionId', id); } catch (_) {}
   return id;
 }
 const SESSION_ID = getOrCreateSessionId();
@@ -53,6 +82,7 @@ let settingsProfiles = [];
 const CHANNEL_NAME = 'reference-overlay-' + SESSION_ID;
 const LS_KEY       = 'referenceOverlayState-' + SESSION_ID;
 const GLOBAL_TEMPLATE_KEY = 'overlayCustomTemplateGlobal';
+const ATEM_EXPORT_PIN_KEY = 'overlayAtemExportPin-' + SESSION_ID;
 let channel        = null;
 
 try {
@@ -92,11 +122,13 @@ const DEFAULT_TEXT_EFFECTS = {
     fontScale: 1,
     useCustomColor: false,
     fontColor: '#ffffff',
+    shadowEnabled: true,
     shadowColor: '#000000',
     shadowAngle: 120,
     shadowDepth: 6,
     shadowBlur: 8,
     shadowOpacity: 0.85,
+    strokeEnabled: false,
     strokeColor: '#000000',
     strokeWidth: 0,
   },
@@ -106,11 +138,13 @@ const DEFAULT_TEXT_EFFECTS = {
     fontScale: 1,
     useCustomColor: false,
     fontColor: '#ffffff',
+    shadowEnabled: true,
     shadowColor: '#000000',
     shadowAngle: 120,
     shadowDepth: 4,
     shadowBlur: 6,
     shadowOpacity: 0.75,
+    strokeEnabled: false,
     strokeColor: '#000000',
     strokeWidth: 0,
   },
@@ -143,6 +177,9 @@ document.addEventListener('DOMContentLoaded', () => {
       + 'output.html?session=' + SESSION_ID;
     bsiUrl.textContent = outputUrl;
   }
+  const savedPin = (() => { try { return localStorage.getItem(ATEM_EXPORT_PIN_KEY) === '1'; } catch (_) { return false; } })();
+  updateAtemExportUiState(savedPin);
+  setOutputSetupTab('browser');
 
   // Restore transparent note visibility
   const savedChroma = document.querySelector('input[name="chroma"]:checked')?.value;
@@ -150,6 +187,7 @@ document.addEventListener('DOMContentLoaded', () => {
   if (note) note.style.display = (savedChroma === 'transparent') ? '' : 'none';
 
   initSettingsPanelUi();
+  initSettingsSubsectionState();
   switchTextEffectsLine('line1');
   initMonitorRenderSync();
   scheduleMonitorRenderSync();
@@ -396,7 +434,15 @@ function maybeApplyLanguageFont(lang, force = false) {
 }
 
 function getLineTextEffect(settings, lineKey) {
-  return { ...DEFAULT_TEXT_EFFECTS[lineKey], ...(settings?.textEffects?.[lineKey] || {}) };
+  const merged = { ...DEFAULT_TEXT_EFFECTS[lineKey], ...(settings?.textEffects?.[lineKey] || {}) };
+  // Backward compatibility with presets saved before explicit enable toggles existed.
+  if (typeof merged.strokeEnabled === 'undefined') {
+    merged.strokeEnabled = (parseFloat(merged.strokeWidth) || 0) > 0;
+  }
+  if (typeof merged.shadowEnabled === 'undefined') {
+    merged.shadowEnabled = true;
+  }
+  return merged;
 }
 
 function hexToRgba(hex, alpha) {
@@ -409,11 +455,68 @@ function hexToRgba(hex, alpha) {
   return `rgba(${r},${g},${b},${a})`;
 }
 
+
+const INLINE_LOWER_THIRD_STYLES = new Set(['inline-duo', 'inline-chip', 'inline-glass']);
+const LOWER_THIRD_BACKGROUND_MODE = Object.freeze({
+  classic: 'custom-solid',
+  accent: 'transparent',
+  minimal: 'transparent',
+  outline: 'transparent',
+  gradient: 'custom-gradient',
+  scripture: 'custom-gradient',
+  'scripture-panel': 'custom-solid',
+  solid: 'style-defined',
+  split: 'custom-solid',
+  frosted: 'custom-solid',
+  'inline-duo': 'custom-solid',
+  'inline-chip': 'custom-solid',
+  'inline-glass': 'custom-gradient',
+});
+
+function getLowerThirdBackgroundMode(style) {
+  return LOWER_THIRD_BACKGROUND_MODE[style] || 'custom-solid';
+}
+
+function isInlineLowerThirdStyle(style) {
+  return INLINE_LOWER_THIRD_STYLES.has(style);
+}
+
+function applyStyleAwareLowerThirdBackground(ltTextEl, settings) {
+  if (!ltTextEl || !settings) return;
+  const style = settings.style || 'gradient';
+  const bgColor = settings.ltBgColor || '#000000';
+  const bgOpacity = Math.max(0, Math.min(1, parseFloat(settings.ltBgOpacity ?? 0.88)));
+  const mode = getLowerThirdBackgroundMode(style);
+
+  ltTextEl.style.background = '';
+
+  if (mode === 'transparent') {
+    ltTextEl.style.background = 'transparent';
+    return;
+  }
+
+  if (mode === 'custom-gradient') {
+    const start = hexToRgba(bgColor, Math.max(0, Math.min(1, bgOpacity * 1.05)));
+    const mid = hexToRgba(bgColor, Math.max(0, Math.min(1, bgOpacity * 0.72)));
+    const end = hexToRgba(bgColor, 0);
+    ltTextEl.style.background = `linear-gradient(90deg, ${start} 0%, ${mid} 62%, ${end} 100%)`;
+    return;
+  }
+
+  if (mode === 'custom-solid') {
+    ltTextEl.style.background = hexToRgba(bgColor, bgOpacity);
+    return;
+  }
+
+  // style-defined: preserve CSS-defined background for the selected style.
+}
+
 function applyLineEffectToEl(el, effect) {
   if (!el || !effect) return;
   el.style.fontWeight = String(effect.fontWeight || '');
   el.style.fontStyle = effect.italic ? 'italic' : '';
   el.style.color = effect.useCustomColor ? (effect.fontColor || '#ffffff') : '';
+  const shadowEnabled = effect.shadowEnabled !== false;
   const depth = Math.max(0, parseFloat(effect.shadowDepth) || 0);
   const angle = ((parseFloat(effect.shadowAngle) || 0) % 360) * (Math.PI / 180);
   const blur = Math.max(0, parseFloat(effect.shadowBlur) || 0);
@@ -421,12 +524,13 @@ function applyLineEffectToEl(el, effect) {
   const x = Math.cos(angle) * depth;
   const y = Math.sin(angle) * depth;
   const shadowColor = hexToRgba(effect.shadowColor, opacity);
-  el.style.textShadow = (depth > 0 || blur > 0)
+  el.style.textShadow = (shadowEnabled && (depth > 0 || blur > 0))
     ? `${x.toFixed(1)}px ${y.toFixed(1)}px ${blur.toFixed(1)}px ${shadowColor}`
     : 'none';
 
+  const strokeEnabled = !!effect.strokeEnabled;
   const strokeWidth = Math.max(0, parseFloat(effect.strokeWidth) || 0);
-  el.style.webkitTextStroke = strokeWidth > 0
+  el.style.webkitTextStroke = (strokeEnabled && strokeWidth > 0)
     ? `${strokeWidth.toFixed(1)}px ${effect.strokeColor || '#000000'}`
     : '0px transparent';
 }
@@ -1283,25 +1387,47 @@ function applyMonitorTickerStyle(barEl, badgeEl, textEl, viewportEl, td) {
 
 function applyLowerThirdVisualSettings(ltEl, ltTextEl, line2El, settings) {
   if (!ltEl || !ltTextEl || !settings) return;
-  const bgColor = settings.ltBgColor || '#000000';
-  const bgOpacity = Math.max(0, Math.min(1, parseFloat(settings.ltBgOpacity ?? 0.88)));
-  ltTextEl.style.background = hexToRgba(bgColor, bgOpacity);
+  applyStyleAwareLowerThirdBackground(ltTextEl, settings);
 
   const widthPct = Math.max(40, Math.min(100, parseInt(settings.ltWidth || 100, 10)));
   ltEl.style.width = `${widthPct}%`;
   ltEl.style.maxWidth = '100%';
 
   if (line2El) {
-    const multiline = !!settings.line2Multiline;
+    const inlineStyle = isInlineLowerThirdStyle(settings.style || 'gradient');
+    const multiline = !!settings.line2Multiline && !inlineStyle;
     const maxLines = Math.max(1, Math.min(6, parseInt(settings.line2MaxLines || 2, 10)));
+    const hasLine2 = !!(line2El.textContent || '').trim();
+
     line2El.style.whiteSpace = multiline ? 'normal' : 'nowrap';
-    line2El.style.overflow = multiline ? 'hidden' : 'hidden';
+    line2El.style.overflow = 'hidden';
     line2El.style.textOverflow = multiline ? 'clip' : 'ellipsis';
-    line2El.style.display = line2El.textContent ? (multiline ? '-webkit-box' : '') : 'none';
+    line2El.style.display = !hasLine2 ? 'none' : (multiline ? '-webkit-box' : 'block');
     line2El.style.webkitBoxOrient = multiline ? 'vertical' : '';
     line2El.style.webkitLineClamp = multiline ? String(maxLines) : '';
     line2El.style.lineClamp = multiline ? String(maxLines) : '';
   }
+}
+
+function updateSettingsCompactState() {
+  const panel = document.getElementById('settings-panel');
+  if (!panel) return;
+  const sections = panel.querySelectorAll('.settings-subsection');
+  if (!sections.length) {
+    panel.classList.remove('compact-collapsed');
+    return;
+  }
+  const anyOpen = Array.from(sections).some((sec) => sec.open);
+  panel.classList.toggle('compact-collapsed', !anyOpen);
+}
+
+function initSettingsSubsectionState() {
+  const panel = document.getElementById('settings-panel');
+  if (!panel) return;
+  panel.querySelectorAll('.settings-subsection').forEach((sec) => {
+    sec.addEventListener('toggle', updateSettingsCompactState);
+  });
+  updateSettingsCompactState();
 }
 
 function switchTextEffectsLine(lineKey) {
@@ -1315,6 +1441,27 @@ function switchTextEffectsLine(lineKey) {
   if (l2Btn)  l2Btn.classList.toggle('active', !showLine1);
   if (l1Card) l1Card.style.display = showLine1 ? '' : 'none';
   if (l2Card) l2Card.style.display = showLine1 ? 'none' : '';
+}
+
+function updateTextFxSectionState(lineKey, sectionKey) {
+  const enabledInput = document.getElementById(`${lineKey}-${sectionKey}-enabled`);
+  const sectionEl = document.getElementById(`${lineKey}-${sectionKey}-section`);
+  if (!enabledInput || !sectionEl) return;
+  const isEnabled = !!enabledInput.checked;
+  sectionEl.classList.toggle('disabled', !isEnabled);
+}
+
+function onTextFxSectionToggle(lineKey, sectionKey) {
+  updateTextFxSectionState(lineKey, sectionKey);
+  onSettingsChange();
+}
+
+function toggleTextFxSection(lineKey, sectionKey) {
+  const sectionBodyEl = document.getElementById(`${lineKey}-${sectionKey}-section`);
+  if (!sectionBodyEl) return;
+  const sectionCardEl = sectionBodyEl.closest('.textfx-section');
+  if (!sectionCardEl) return;
+  sectionCardEl.classList.toggle('collapsed');
 }
 
 function applyMonitorCustomStageScale(stageEl, viewportEl) {
@@ -2297,9 +2444,152 @@ function toggleSettingsPanel() {
   setSettingsPanelState(panel.open);
 }
 
+function openUserGuide() {
+  const modal = document.getElementById('user-guide-modal');
+  if (!modal) return;
+  modal.classList.add('open');
+  modal.setAttribute('aria-hidden', 'false');
+  document.body.style.overflow = 'hidden';
+}
+
+function closeUserGuide() {
+  const modal = document.getElementById('user-guide-modal');
+  if (!modal) return;
+  modal.classList.remove('open');
+  modal.setAttribute('aria-hidden', 'true');
+  document.body.style.overflow = '';
+}
+
+function isUserGuideOpen() {
+  const modal = document.getElementById('user-guide-modal');
+  return !!(modal && modal.classList.contains('open'));
+}
+
+function setOutputSetupTab(tab) {
+  const browserBtn = document.getElementById('output-tab-browser');
+  const atemBtn = document.getElementById('output-tab-atem');
+  const browserPanel = document.getElementById('output-panel-browser');
+  const atemPanel = document.getElementById('output-panel-atem');
+  const showBrowser = tab !== 'atem';
+
+  if (browserBtn) {
+    browserBtn.classList.toggle('is-active', showBrowser);
+    browserBtn.setAttribute('aria-selected', showBrowser ? 'true' : 'false');
+  }
+  if (atemBtn) {
+    atemBtn.classList.toggle('is-active', !showBrowser);
+    atemBtn.setAttribute('aria-selected', !showBrowser ? 'true' : 'false');
+  }
+  if (browserPanel) {
+    browserPanel.classList.toggle('is-active', showBrowser);
+    browserPanel.hidden = !showBrowser;
+  }
+  if (atemPanel) {
+    atemPanel.classList.toggle('is-active', !showBrowser);
+    atemPanel.hidden = showBrowser;
+  }
+}
+
 // ── Copy Output Link ──────────────────────────────────────────────────────────
 // Copies the output.html URL (with session ID and current origin/path) so the
 // operator can paste it into a TV browser or another device on the same network.
+
+
+function getAtemExportImageUrl(sessionId = SESSION_ID, alphaMode = 'premultiplied') {
+  const mode = String(alphaMode || '').trim().toLowerCase();
+  const url = new URL(location.origin + '/atem-live/' + encodeURIComponent(sessionId) + '.png');
+  if (mode === 'straight' || mode === 'premultiplied') {
+    url.searchParams.set('alpha', mode);
+  }
+  return url.toString();
+}
+
+function updateAtemExportUiState(isPinned) {
+  const pinEl = document.getElementById('atem-pin-session');
+  const stateEl = document.getElementById('atem-pin-state');
+  const premultUrlEl = document.getElementById('atem-export-url');
+  const straightUrlEl = document.getElementById('atem-export-url-straight');
+
+  if (pinEl) pinEl.checked = !!isPinned;
+  if (premultUrlEl) premultUrlEl.textContent = getAtemExportImageUrl(SESSION_ID, 'premultiplied');
+  if (straightUrlEl) straightUrlEl.textContent = getAtemExportImageUrl(SESSION_ID, 'straight');
+  if (stateEl) {
+    if (isPinned) {
+      stateEl.textContent = 'Included in export';
+      stateEl.style.color = 'var(--accent)';
+    } else {
+      stateEl.textContent = 'Not included';
+      stateEl.style.color = 'var(--text-muted)';
+    }
+  }
+}
+
+function requestAtemExportStatus() {
+  if (ws && ws.readyState === WebSocket.OPEN) {
+    try {
+      ws.send(JSON.stringify({ action: 'atem-export-status', sessionId: SESSION_ID }));
+    } catch (_) {}
+  }
+}
+
+function syncAtemExportPinConfig() {
+  const pinEl = document.getElementById('atem-pin-session');
+  const shouldPin = !!pinEl?.checked;
+  try { localStorage.setItem(ATEM_EXPORT_PIN_KEY, shouldPin ? '1' : '0'); } catch (_) {}
+  updateAtemExportUiState(shouldPin);
+
+  if (ws && ws.readyState === WebSocket.OPEN) {
+    try {
+      ws.send(JSON.stringify({
+        action: 'atem-export-config',
+        pinCurrentSession: shouldPin,
+        sessionId: SESSION_ID,
+      }));
+    } catch (_) {}
+  }
+}
+
+function onAtemExportPinToggle() {
+  syncAtemExportPinConfig();
+}
+
+function copyAtemExportLink() {
+  // Backward compatibility for existing bindings.
+  copyAtemPremultipliedLink();
+}
+
+function copyAtemPremultipliedLink() {
+  const url = getAtemExportImageUrl(SESSION_ID, 'premultiplied');
+  navigator.clipboard.writeText(url).catch(() => prompt('Copy this ATEM premultiplied export URL:', url));
+}
+
+function copyAtemStraightLink() {
+  const url = getAtemExportImageUrl(SESSION_ID, 'straight');
+  navigator.clipboard.writeText(url).catch(() => prompt('Copy this straight alpha preview URL:', url));
+}
+
+function onAtemExportRegenerate() {
+  const btn = document.getElementById('atem-refresh-btn');
+  const setBusy = (busy, label) => {
+    if (!btn) return;
+    btn.classList.toggle('is-working', !!busy);
+    btn.textContent = label;
+  };
+
+  if (ws && ws.readyState === WebSocket.OPEN) {
+    try {
+      ws.send(JSON.stringify({ action: 'atem-export-refresh', sessionId: SESSION_ID }));
+      setBusy(true, 'Queued');
+      setTimeout(() => setBusy(false, 'Regenerate'), 1400);
+      return;
+    } catch (_) {}
+  }
+
+  setBusy(true, 'No WS');
+  setTimeout(() => setBusy(false, 'Regenerate'), 1400);
+}
+
+
 function copyOutputLink() {
   const outputUrl = location.origin + location.pathname.replace(/index\.html$/, '').replace(/[^/]*$/, '')
     + 'output.html?session=' + SESSION_ID;
@@ -2378,6 +2668,8 @@ function initWebSocket() {
       wsRetryDelay = 5000;
       setWsIndicator('online');
       syncCurrentStateToOutputs();
+      syncAtemExportPinConfig();
+      requestAtemExportStatus();
     };
     ws.onclose   = () => {
       ws = null;
@@ -2409,6 +2701,10 @@ function handleRemoteCommand(msg) {
   if (!msg || !msg.action) return;
   if (msg.action === 'show')  sendShow();
   if (msg.action === 'clear') sendClear();
+  if (msg.action === 'atem-export-config-ack') {
+    const sessions = Array.isArray(msg.pinnedSessions) ? msg.pinnedSessions : [];
+    updateAtemExportUiState(sessions.includes(SESSION_ID));
+  }
 }
 
 // ── Settings ──────────────────────────────────────────────────────────────────
@@ -2428,11 +2724,13 @@ function getSettings() {
     fontScale:    parseFloat(document.getElementById('line1-font-scale')?.value || String(DEFAULT_TEXT_EFFECTS.line1.fontScale)),
     useCustomColor: !!document.getElementById('line1-custom-color')?.checked,
     fontColor:    document.getElementById('line1-font-color')?.value || DEFAULT_TEXT_EFFECTS.line1.fontColor,
+    shadowEnabled: !!document.getElementById('line1-shadow-enabled')?.checked,
     shadowColor:  document.getElementById('line1-shadow-color')?.value || DEFAULT_TEXT_EFFECTS.line1.shadowColor,
     shadowAngle:  parseFloat(document.getElementById('line1-shadow-angle')?.value || String(DEFAULT_TEXT_EFFECTS.line1.shadowAngle)),
     shadowDepth:  parseFloat(document.getElementById('line1-shadow-depth')?.value || String(DEFAULT_TEXT_EFFECTS.line1.shadowDepth)),
     shadowBlur:   parseFloat(document.getElementById('line1-shadow-blur')?.value || String(DEFAULT_TEXT_EFFECTS.line1.shadowBlur)),
     shadowOpacity:parseFloat(document.getElementById('line1-shadow-opacity')?.value || String(DEFAULT_TEXT_EFFECTS.line1.shadowOpacity)),
+    strokeEnabled: !!document.getElementById('line1-stroke-enabled')?.checked,
     strokeColor:  document.getElementById('line1-stroke-color')?.value || DEFAULT_TEXT_EFFECTS.line1.strokeColor,
     strokeWidth:  parseFloat(document.getElementById('line1-stroke-width')?.value || String(DEFAULT_TEXT_EFFECTS.line1.strokeWidth)),
   };
@@ -2442,11 +2740,13 @@ function getSettings() {
     fontScale:    parseFloat(document.getElementById('line2-font-scale')?.value || String(DEFAULT_TEXT_EFFECTS.line2.fontScale)),
     useCustomColor: !!document.getElementById('line2-custom-color')?.checked,
     fontColor:    document.getElementById('line2-font-color')?.value || DEFAULT_TEXT_EFFECTS.line2.fontColor,
+    shadowEnabled: !!document.getElementById('line2-shadow-enabled')?.checked,
     shadowColor:  document.getElementById('line2-shadow-color')?.value || DEFAULT_TEXT_EFFECTS.line2.shadowColor,
     shadowAngle:  parseFloat(document.getElementById('line2-shadow-angle')?.value || String(DEFAULT_TEXT_EFFECTS.line2.shadowAngle)),
     shadowDepth:  parseFloat(document.getElementById('line2-shadow-depth')?.value || String(DEFAULT_TEXT_EFFECTS.line2.shadowDepth)),
     shadowBlur:   parseFloat(document.getElementById('line2-shadow-blur')?.value || String(DEFAULT_TEXT_EFFECTS.line2.shadowBlur)),
     shadowOpacity:parseFloat(document.getElementById('line2-shadow-opacity')?.value || String(DEFAULT_TEXT_EFFECTS.line2.shadowOpacity)),
+    strokeEnabled: !!document.getElementById('line2-stroke-enabled')?.checked,
     strokeColor:  document.getElementById('line2-stroke-color')?.value || DEFAULT_TEXT_EFFECTS.line2.strokeColor,
     strokeWidth:  parseFloat(document.getElementById('line2-stroke-width')?.value || String(DEFAULT_TEXT_EFFECTS.line2.strokeWidth)),
   };
@@ -2649,6 +2949,10 @@ function onLtMinHeightInput() {
 function setTextEffectsUI(textEffects) {
   const l1 = { ...DEFAULT_TEXT_EFFECTS.line1, ...(textEffects?.line1 || {}) };
   const l2 = { ...DEFAULT_TEXT_EFFECTS.line2, ...(textEffects?.line2 || {}) };
+  if (typeof l1.strokeEnabled === 'undefined') l1.strokeEnabled = (parseFloat(l1.strokeWidth) || 0) > 0;
+  if (typeof l2.strokeEnabled === 'undefined') l2.strokeEnabled = (parseFloat(l2.strokeWidth) || 0) > 0;
+  if (typeof l1.shadowEnabled === 'undefined') l1.shadowEnabled = true;
+  if (typeof l2.shadowEnabled === 'undefined') l2.shadowEnabled = true;
   populateFontWeightSelect('line1', l1.fontWeight);
   populateFontWeightSelect('line2', l2.fontWeight);
 
@@ -2658,11 +2962,13 @@ function setTextEffectsUI(textEffects) {
     ['line1-font-scale', l1.fontScale],
     ['line1-custom-color', !!l1.useCustomColor],
     ['line1-font-color', l1.fontColor],
+    ['line1-shadow-enabled', !!l1.shadowEnabled],
     ['line1-shadow-color', l1.shadowColor],
     ['line1-shadow-angle', l1.shadowAngle],
     ['line1-shadow-depth', l1.shadowDepth],
     ['line1-shadow-blur', l1.shadowBlur],
     ['line1-shadow-opacity', l1.shadowOpacity],
+    ['line1-stroke-enabled', !!l1.strokeEnabled],
     ['line1-stroke-color', l1.strokeColor],
     ['line1-stroke-width', l1.strokeWidth],
     ['line2-font-weight', l2.fontWeight],
@@ -2670,11 +2976,13 @@ function setTextEffectsUI(textEffects) {
     ['line2-font-scale', l2.fontScale],
     ['line2-custom-color', !!l2.useCustomColor],
     ['line2-font-color', l2.fontColor],
+    ['line2-shadow-enabled', !!l2.shadowEnabled],
     ['line2-shadow-color', l2.shadowColor],
     ['line2-shadow-angle', l2.shadowAngle],
     ['line2-shadow-depth', l2.shadowDepth],
     ['line2-shadow-blur', l2.shadowBlur],
     ['line2-shadow-opacity', l2.shadowOpacity],
+    ['line2-stroke-enabled', !!l2.strokeEnabled],
     ['line2-stroke-color', l2.strokeColor],
     ['line2-stroke-width', l2.strokeWidth],
   ];
@@ -2687,6 +2995,10 @@ function setTextEffectsUI(textEffects) {
       el.value = String(value);
     }
   });
+  updateTextFxSectionState('line1', 'stroke');
+  updateTextFxSectionState('line1', 'shadow');
+  updateTextFxSectionState('line2', 'stroke');
+  updateTextFxSectionState('line2', 'shadow');
 }
 
 function updateTextEffectLabels() {
@@ -3022,6 +3334,12 @@ function clearLogo() {
 // ── Keyboard Shortcuts ────────────────────────────────────────────────────────
 function bindKeyboard() {
   document.addEventListener('keydown', e => {
+    if (e.key === 'Escape' && isUserGuideOpen()) {
+      e.preventDefault();
+      closeUserGuide();
+      return;
+    }
+
     const tag = document.activeElement.tagName;
     if (tag === 'INPUT' || tag === 'SELECT' || tag === 'TEXTAREA') {
       if (e.key === 'Enter' && document.activeElement.type === 'text') {
@@ -3041,6 +3359,7 @@ function bindKeyboard() {
       case 's': case 'S': setMode('speaker');                        break;
       case 't': case 'T': setMode('ticker');                         break;
       case 'o': case 'O': openOutputWindow();                        break;
+      case 'h': case 'H': openUserGuide();                           break;
     }
   });
 }

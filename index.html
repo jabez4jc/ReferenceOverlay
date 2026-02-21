@@ -38,6 +38,10 @@
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"/><polyline points="15 3 21 3 21 9"/><line x1="10" y1="14" x2="21" y2="3"/></svg>
         Output Window
       </button>
+      <button class="btn-session" id="btn-user-guide" onclick="openUserGuide()" title="Open user guide">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><line x1="12" y1="16" x2="12" y2="12"/><line x1="12" y1="8" x2="12.01" y2="8"/></svg>
+        User Guide
+      </button>
       <button class="btn-settings-toggle" id="btn-settings-toggle" onclick="toggleSettingsPanel()" title="Toggle settings panel" aria-expanded="false">
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="3"/><path d="M19.07 4.93a10 10 0 0 1 0 14.14M4.93 4.93a10 10 0 0 0 0 14.14"/><path d="M12 2v2M12 20v2M2 12h2M20 12h2"/></svg>
         <span class="btn-settings-label">Settings</span>
@@ -443,25 +447,67 @@
           </div>
         </div>
 
+        <div class="setting-row">
+          <div class="setting-group span-full">
+            <details class="settings-subsection">
+              <summary>
+                <span>Output Setup</span>
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="6 9 12 15 18 9"></polyline></svg>
+              </summary>
+              <div class="settings-subsection-body">
         <!-- Browser Source Connection -->
         <div class="setting-row">
           <div class="setting-group span-full">
-            <label class="setting-label">Browser Source Setup</label>
             <div class="browser-source-info">
-              <div class="bsi-row">
-                <span class="bsi-label">Output URL</span>
-                <code class="bsi-url" id="bsi-url">—</code>
-                <button class="bsi-copy" onclick="copyOutputLink()" title="Copy URL">
-                  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="9" y="9" width="13" height="13" rx="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></svg>
-                </button>
-                <details class="bsi-help">
-                  <summary class="bsi-help-btn" title="Setup guidance">i</summary>
-                  <div class="bsi-notes">
-                    <p><strong>OBS / vMix:</strong> Add a Browser Source → paste the URL above → set width/height to match your output resolution → tick <em>Allow transparency</em> if using Transparent mode above, or add a Chroma Key filter if using a colour background.</p>
-                    <p><strong>Cross-device control (phone → TV):</strong> Run <code>node server.js</code> on the same computer that serves the files. Use the server's IP address in the URL above. Both the control panel and the Browser Source must connect via <code>http://</code> (not <code>file://</code>) for messages to relay through the WebSocket server.</p>
-                  </div>
-                </details>
+              <div class="bsi-tabs" role="tablist" aria-label="Output setup sections">
+                <button type="button" id="output-tab-browser" class="bsi-tab is-active" onclick="setOutputSetupTab('browser')" role="tab" aria-selected="true">Browser Source</button>
+                <button type="button" id="output-tab-atem" class="bsi-tab" onclick="setOutputSetupTab('atem')" role="tab" aria-selected="false">ATEM PNG Export</button>
               </div>
+
+              <section id="output-panel-browser" class="bsi-panel is-active" role="tabpanel" aria-labelledby="output-tab-browser">
+                <div class="bsi-row">
+                  <span class="bsi-label">Output URL</span>
+                  <code class="bsi-url" id="bsi-url">—</code>
+                  <button class="bsi-copy" onclick="copyOutputLink()" title="Copy URL">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="9" y="9" width="13" height="13" rx="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></svg>
+                  </button>
+                  <details class="bsi-help">
+                    <summary class="bsi-help-btn" title="Setup guidance">i</summary>
+                    <div class="bsi-notes">
+                      <p><strong>1. Add Browser Source:</strong> In OBS/vMix, add a Browser Source and paste the Output URL above.</p>
+                      <p><strong>2. Match output size:</strong> Set width and height to your selected output resolution (for example 1920 × 1080).</p>
+                      <p><strong>3. Choose keying mode:</strong> Use <em>Allow transparency</em> with Transparent mode, or use Chroma Key when a color background is selected.</p>
+                    </div>
+                  </details>
+                </div>
+              </section>
+
+              <section id="output-panel-atem" class="bsi-panel" role="tabpanel" aria-labelledby="output-tab-atem" hidden>
+                <div class="bsi-export-row">
+                  <label class="bsi-pin-toggle" title="Enable ATEM PNG export updates for this session.">
+                    <input type="checkbox" id="atem-pin-session" onchange="onAtemExportPinToggle()" />
+                    <span>Include this session in ATEM export</span>
+                  </label>
+                  <span class="bsi-pin-state" id="atem-pin-state">Not included</span>
+                </div>
+                <div class="bsi-row bsi-atem-url-row">
+                  <span class="bsi-label">ATEM PNG URL (Premultiplied)</span>
+                  <code class="bsi-url" id="atem-export-url">/atem-live/&lt;session&gt;.png?alpha=premultiplied</code>
+                  <button class="bsi-copy" onclick="copyAtemPremultipliedLink()" title="Copy ATEM Premultiplied PNG URL">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="9" y="9" width="13" height="13" rx="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></svg>
+                  </button>
+                  <button class="bsi-copy bsi-copy-text" id="atem-refresh-btn" onclick="onAtemExportRegenerate()" title="Regenerate ATEM PNG now">
+                    Regenerate
+                  </button>
+                </div>
+                <div class="bsi-row bsi-atem-url-row">
+                  <span class="bsi-label">Preview PNG URL (Straight)</span>
+                  <code class="bsi-url" id="atem-export-url-straight">/atem-live/&lt;session&gt;.png?alpha=straight</code>
+                  <button class="bsi-copy" onclick="copyAtemStraightLink()" title="Copy Straight Alpha PNG URL for browser preview">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="9" y="9" width="13" height="13" rx="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></svg>
+                  </button>
+                </div>
+              </section>
             </div>
           </div>
         </div>
@@ -490,6 +536,9 @@
               <option value="solid">Solid — Accent fill</option>
               <option value="split">Split lines</option>
               <option value="frosted">Frosted glass</option>
+              <option value="inline-duo">Inline Duo — one-line modern</option>
+              <option value="inline-chip">Inline Chip — highlighted line 2</option>
+              <option value="inline-glass">Inline Glass — soft gradient</option>
             </select>
           </div>
         </div>
@@ -544,7 +593,7 @@
           <div class="setting-group">
             <label class="template-toggle-label">
               <input type="checkbox" id="line2-multiline" onchange="onSettingsChange()" />
-              Allow Line 2 multiline
+              Line 2 Multiline
             </label>
             <label class="setting-label" for="line2-max-lines">
               Max Line 2 Lines
@@ -594,195 +643,251 @@
           </div>
         </div>
 
+              </div>
+            </details>
+          </div>
+        </div>
+        <div class="setting-row">
+          <div class="setting-group span-full">
+            <details class="settings-subsection">
+              <summary>
+                <span>Text Effects (Per Line)</span>
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="6 9 12 15 18 9"></polyline></svg>
+              </summary>
+              <div class="settings-subsection-body">
         <!-- Text Effects -->
         <div class="setting-row">
           <div class="setting-group span-full">
-            <label class="setting-label">Text Effects (Per Line)</label>
             <div class="textfx-tabs" role="tablist" aria-label="Text effects line selector">
               <button type="button" id="textfx-tab-line1" class="textfx-tab active" onclick="switchTextEffectsLine('line1')">Line 1</button>
               <button type="button" id="textfx-tab-line2" class="textfx-tab" onclick="switchTextEffectsLine('line2')">Line 2</button>
             </div>
+
             <div class="text-effects-grid">
               <div class="text-effects-card" id="textfx-card-line1">
                 <div class="text-effects-title">Line 1</div>
+
                 <div class="setting-group">
                   <label class="setting-label" for="line1-font-select">Font</label>
-                  <select id="line1-font-select" onchange="onLineFontChange('line1')">
-                    <!-- populated by JS from FONT_OPTIONS -->
-                  </select>
+                  <select id="line1-font-select" onchange="onLineFontChange('line1')"></select>
                 </div>
-                <div class="setting-group">
-                  <label class="setting-label" for="line1-font-weight">Font Weight</label>
-                  <select id="line1-font-weight" onchange="onSettingsChange()">
-                    <option value="400">Regular (400)</option>
-                    <option value="500">Medium (500)</option>
-                    <option value="600">Semi Bold (600)</option>
-                    <option value="700" selected>Bold (700)</option>
-                    <option value="800">Extra Bold (800)</option>
-                    <option value="900">Black (900)</option>
-                  </select>
-                </div>
-                <div class="setting-group">
-                  <label class="setting-label">Font Style</label>
-                  <label class="template-toggle-label">
-                    <input type="checkbox" id="line1-italic" onchange="onSettingsChange()" />
-                    Italic
-                  </label>
-                </div>
-                <div class="setting-group">
-                  <label class="setting-label" for="line1-font-scale">Font Size</label>
-                  <div class="slider-row">
-                    <input type="range" id="line1-font-scale" min="0.6" max="1.8" step="0.05" value="1"
-                           oninput="onTextFxRangeInput('line1-font-scale','line1-font-scale-val','×')" />
-                    <span class="slider-value" id="line1-font-scale-val">1×</span>
+
+                <div class="textfx-2col">
+                  <div class="setting-group">
+                    <label class="setting-label" for="line1-font-weight">Weight</label>
+                    <select id="line1-font-weight" onchange="onSettingsChange()"></select>
+                  </div>
+                  <div class="setting-group">
+                    <label class="setting-label">Custom Color</label>
+                    <div class="textfx-inline-check textfx-color-inline">
+                      <input type="checkbox" id="line1-custom-color" onchange="onSettingsChange()" />
+                      <label for="line1-custom-color">Custom Color</label>
+                      <input type="color" id="line1-font-color" class="textfx-inline-color" value="#ffffff" onchange="onSettingsChange()" />
+                    </div>
                   </div>
                 </div>
-                <div class="setting-group">
-                  <label class="setting-label">Text Color</label>
-                  <label class="template-toggle-label">
-                    <input type="checkbox" id="line1-custom-color" onchange="onSettingsChange()" />
-                    Use custom color
-                  </label>
-                  <input type="color" id="line1-font-color" value="#ffffff" onchange="onSettingsChange()" />
-                </div>
-                <div class="setting-group">
-                  <label class="setting-label" for="line1-shadow-color">Shadow Color</label>
-                  <input type="color" id="line1-shadow-color" value="#000000" onchange="onSettingsChange()" />
-                </div>
-                <div class="setting-group">
-                  <label class="setting-label" for="line1-shadow-angle">Shadow Direction</label>
-                  <div class="slider-row">
-                    <input type="range" id="line1-shadow-angle" min="0" max="360" step="1" value="120"
-                           oninput="onTextFxRangeInput('line1-shadow-angle','line1-shadow-angle-val','°')" />
-                    <span class="slider-value" id="line1-shadow-angle-val">120°</span>
+
+                <div class="textfx-2col textfx-2col-compact">
+                  <div class="setting-group">
+                    <label class="setting-label" for="line1-font-scale">Font Size</label>
+                    <div class="slider-row">
+                      <input type="range" id="line1-font-scale" min="0.6" max="1.8" step="0.05" value="1"
+                             oninput="onTextFxRangeInput('line1-font-scale','line1-font-scale-val','×')" />
+                      <span class="slider-value" id="line1-font-scale-val">1×</span>
+                    </div>
+                  </div>
+                  <div class="setting-group">
+                    <label class="setting-label">Style</label>
+                    <div class="textfx-inline-check">
+                      <input type="checkbox" id="line1-italic" onchange="onSettingsChange()" />
+                      <label for="line1-italic">Italic</label>
+                    </div>
                   </div>
                 </div>
-                <div class="setting-group">
-                  <label class="setting-label" for="line1-shadow-depth">Shadow Depth</label>
-                  <div class="slider-row">
-                    <input type="range" id="line1-shadow-depth" min="0" max="40" step="0.5" value="6"
-                           oninput="onTextFxRangeInput('line1-shadow-depth','line1-shadow-depth-val','px')" />
-                    <span class="slider-value" id="line1-shadow-depth-val">6px</span>
+
+                <div class="textfx-section collapsed">
+                  <div class="textfx-section-head">
+                    <label class="textfx-toggle-pill">
+                      <input type="checkbox" id="line1-stroke-enabled" onchange="onTextFxSectionToggle('line1','stroke')" />
+                      <span>Stroke</span>
+                    </label>
+                    <button type="button" class="textfx-collapse-btn" id="line1-stroke-collapse" onclick="toggleTextFxSection('line1','stroke')">▾</button>
+                  </div>
+                  <div class="textfx-section-body" id="line1-stroke-section">
+                    <div class="setting-group">
+                      <label class="setting-label" for="line1-stroke-color">Stroke Color</label>
+                      <input type="color" id="line1-stroke-color" value="#000000" onchange="onSettingsChange()" />
+                    </div>
+                    <div class="setting-group">
+                      <label class="setting-label" for="line1-stroke-width">Stroke Width</label>
+                      <div class="slider-row">
+                        <input type="range" id="line1-stroke-width" min="0" max="4" step="0.1" value="0"
+                               oninput="onTextFxRangeInput('line1-stroke-width','line1-stroke-width-val','px')" />
+                        <span class="slider-value" id="line1-stroke-width-val">0px</span>
+                      </div>
+                    </div>
                   </div>
                 </div>
-                <div class="setting-group">
-                  <label class="setting-label" for="line1-shadow-blur">Shadow Blur</label>
-                  <div class="slider-row">
-                    <input type="range" id="line1-shadow-blur" min="0" max="40" step="0.5" value="8"
-                           oninput="onTextFxRangeInput('line1-shadow-blur','line1-shadow-blur-val','px')" />
-                    <span class="slider-value" id="line1-shadow-blur-val">8px</span>
+
+                <div class="textfx-section collapsed">
+                  <div class="textfx-section-head">
+                    <label class="textfx-toggle-pill">
+                      <input type="checkbox" id="line1-shadow-enabled" onchange="onTextFxSectionToggle('line1','shadow')" />
+                      <span>Drop Shadow</span>
+                    </label>
+                    <button type="button" class="textfx-collapse-btn" id="line1-shadow-collapse" onclick="toggleTextFxSection('line1','shadow')">▾</button>
                   </div>
-                </div>
-                <div class="setting-group">
-                  <label class="setting-label" for="line1-shadow-opacity">Shadow Opacity</label>
-                  <div class="slider-row">
-                    <input type="range" id="line1-shadow-opacity" min="0" max="1" step="0.05" value="0.85"
-                           oninput="onTextFxRangeInput('line1-shadow-opacity','line1-shadow-opacity-val')" />
-                    <span class="slider-value" id="line1-shadow-opacity-val">0.85</span>
-                  </div>
-                </div>
-                <div class="setting-group">
-                  <label class="setting-label" for="line1-stroke-color">Stroke Color</label>
-                  <input type="color" id="line1-stroke-color" value="#000000" onchange="onSettingsChange()" />
-                </div>
-                <div class="setting-group">
-                  <label class="setting-label" for="line1-stroke-width">Stroke Width</label>
-                  <div class="slider-row">
-                    <input type="range" id="line1-stroke-width" min="0" max="4" step="0.1" value="0"
-                           oninput="onTextFxRangeInput('line1-stroke-width','line1-stroke-width-val','px')" />
-                    <span class="slider-value" id="line1-stroke-width-val">0px</span>
+                  <div class="textfx-section-body" id="line1-shadow-section">
+                    <div class="setting-group">
+                      <label class="setting-label" for="line1-shadow-color">Shadow Color</label>
+                      <input type="color" id="line1-shadow-color" value="#000000" onchange="onSettingsChange()" />
+                    </div>
+                    <div class="setting-group">
+                      <label class="setting-label" for="line1-shadow-angle">Direction</label>
+                      <div class="slider-row">
+                        <input type="range" id="line1-shadow-angle" min="0" max="360" step="1" value="120"
+                               oninput="onTextFxRangeInput('line1-shadow-angle','line1-shadow-angle-val','°')" />
+                        <span class="slider-value" id="line1-shadow-angle-val">120°</span>
+                      </div>
+                    </div>
+                    <div class="setting-group">
+                      <label class="setting-label" for="line1-shadow-depth">Depth</label>
+                      <div class="slider-row">
+                        <input type="range" id="line1-shadow-depth" min="0" max="40" step="0.5" value="6"
+                               oninput="onTextFxRangeInput('line1-shadow-depth','line1-shadow-depth-val','px')" />
+                        <span class="slider-value" id="line1-shadow-depth-val">6px</span>
+                      </div>
+                    </div>
+                    <div class="setting-group">
+                      <label class="setting-label" for="line1-shadow-blur">Blur</label>
+                      <div class="slider-row">
+                        <input type="range" id="line1-shadow-blur" min="0" max="40" step="0.5" value="8"
+                               oninput="onTextFxRangeInput('line1-shadow-blur','line1-shadow-blur-val','px')" />
+                        <span class="slider-value" id="line1-shadow-blur-val">8px</span>
+                      </div>
+                    </div>
+                    <div class="setting-group">
+                      <label class="setting-label" for="line1-shadow-opacity">Opacity</label>
+                      <div class="slider-row">
+                        <input type="range" id="line1-shadow-opacity" min="0" max="1" step="0.05" value="0.85"
+                               oninput="onTextFxRangeInput('line1-shadow-opacity','line1-shadow-opacity-val')" />
+                        <span class="slider-value" id="line1-shadow-opacity-val">0.85</span>
+                      </div>
+                    </div>
                   </div>
                 </div>
               </div>
 
               <div class="text-effects-card" id="textfx-card-line2" style="display:none">
                 <div class="text-effects-title">Line 2</div>
+
                 <div class="setting-group">
                   <label class="setting-label" for="line2-font-select">Font</label>
-                  <select id="line2-font-select" onchange="onLineFontChange('line2')">
-                    <!-- populated by JS from FONT_OPTIONS -->
-                  </select>
+                  <select id="line2-font-select" onchange="onLineFontChange('line2')"></select>
                 </div>
-                <div class="setting-group">
-                  <label class="setting-label" for="line2-font-weight">Font Weight</label>
-                  <select id="line2-font-weight" onchange="onSettingsChange()">
-                    <option value="300">Light (300)</option>
-                    <option value="400" selected>Regular (400)</option>
-                    <option value="500">Medium (500)</option>
-                    <option value="600">Semi Bold (600)</option>
-                    <option value="700">Bold (700)</option>
-                    <option value="800">Extra Bold (800)</option>
-                  </select>
-                </div>
-                <div class="setting-group">
-                  <label class="setting-label">Font Style</label>
-                  <label class="template-toggle-label">
-                    <input type="checkbox" id="line2-italic" onchange="onSettingsChange()" />
-                    Italic
-                  </label>
-                </div>
-                <div class="setting-group">
-                  <label class="setting-label" for="line2-font-scale">Font Size</label>
-                  <div class="slider-row">
-                    <input type="range" id="line2-font-scale" min="0.6" max="1.8" step="0.05" value="1"
-                           oninput="onTextFxRangeInput('line2-font-scale','line2-font-scale-val','×')" />
-                    <span class="slider-value" id="line2-font-scale-val">1×</span>
+
+                <div class="textfx-2col">
+                  <div class="setting-group">
+                    <label class="setting-label" for="line2-font-weight">Weight</label>
+                    <select id="line2-font-weight" onchange="onSettingsChange()"></select>
+                  </div>
+                  <div class="setting-group">
+                    <label class="setting-label">Custom Color</label>
+                    <div class="textfx-inline-check textfx-color-inline">
+                      <input type="checkbox" id="line2-custom-color" onchange="onSettingsChange()" />
+                      <label for="line2-custom-color">Custom Color</label>
+                      <input type="color" id="line2-font-color" class="textfx-inline-color" value="#ffffff" onchange="onSettingsChange()" />
+                    </div>
                   </div>
                 </div>
-                <div class="setting-group">
-                  <label class="setting-label">Text Color</label>
-                  <label class="template-toggle-label">
-                    <input type="checkbox" id="line2-custom-color" onchange="onSettingsChange()" />
-                    Use custom color
-                  </label>
-                  <input type="color" id="line2-font-color" value="#ffffff" onchange="onSettingsChange()" />
-                </div>
-                <div class="setting-group">
-                  <label class="setting-label" for="line2-shadow-color">Shadow Color</label>
-                  <input type="color" id="line2-shadow-color" value="#000000" onchange="onSettingsChange()" />
-                </div>
-                <div class="setting-group">
-                  <label class="setting-label" for="line2-shadow-angle">Shadow Direction</label>
-                  <div class="slider-row">
-                    <input type="range" id="line2-shadow-angle" min="0" max="360" step="1" value="120"
-                           oninput="onTextFxRangeInput('line2-shadow-angle','line2-shadow-angle-val','°')" />
-                    <span class="slider-value" id="line2-shadow-angle-val">120°</span>
+
+                <div class="textfx-2col textfx-2col-compact">
+                  <div class="setting-group">
+                    <label class="setting-label" for="line2-font-scale">Font Size</label>
+                    <div class="slider-row">
+                      <input type="range" id="line2-font-scale" min="0.6" max="1.8" step="0.05" value="1"
+                             oninput="onTextFxRangeInput('line2-font-scale','line2-font-scale-val','×')" />
+                      <span class="slider-value" id="line2-font-scale-val">1×</span>
+                    </div>
+                  </div>
+                  <div class="setting-group">
+                    <label class="setting-label">Style</label>
+                    <div class="textfx-inline-check">
+                      <input type="checkbox" id="line2-italic" onchange="onSettingsChange()" />
+                      <label for="line2-italic">Italic</label>
+                    </div>
                   </div>
                 </div>
-                <div class="setting-group">
-                  <label class="setting-label" for="line2-shadow-depth">Shadow Depth</label>
-                  <div class="slider-row">
-                    <input type="range" id="line2-shadow-depth" min="0" max="40" step="0.5" value="4"
-                           oninput="onTextFxRangeInput('line2-shadow-depth','line2-shadow-depth-val','px')" />
-                    <span class="slider-value" id="line2-shadow-depth-val">4px</span>
+
+                <div class="textfx-section collapsed">
+                  <div class="textfx-section-head">
+                    <label class="textfx-toggle-pill">
+                      <input type="checkbox" id="line2-stroke-enabled" onchange="onTextFxSectionToggle('line2','stroke')" />
+                      <span>Stroke</span>
+                    </label>
+                    <button type="button" class="textfx-collapse-btn" id="line2-stroke-collapse" onclick="toggleTextFxSection('line2','stroke')">▾</button>
+                  </div>
+                  <div class="textfx-section-body" id="line2-stroke-section">
+                    <div class="setting-group">
+                      <label class="setting-label" for="line2-stroke-color">Stroke Color</label>
+                      <input type="color" id="line2-stroke-color" value="#000000" onchange="onSettingsChange()" />
+                    </div>
+                    <div class="setting-group">
+                      <label class="setting-label" for="line2-stroke-width">Stroke Width</label>
+                      <div class="slider-row">
+                        <input type="range" id="line2-stroke-width" min="0" max="4" step="0.1" value="0"
+                               oninput="onTextFxRangeInput('line2-stroke-width','line2-stroke-width-val','px')" />
+                        <span class="slider-value" id="line2-stroke-width-val">0px</span>
+                      </div>
+                    </div>
                   </div>
                 </div>
-                <div class="setting-group">
-                  <label class="setting-label" for="line2-shadow-blur">Shadow Blur</label>
-                  <div class="slider-row">
-                    <input type="range" id="line2-shadow-blur" min="0" max="40" step="0.5" value="6"
-                           oninput="onTextFxRangeInput('line2-shadow-blur','line2-shadow-blur-val','px')" />
-                    <span class="slider-value" id="line2-shadow-blur-val">6px</span>
+
+                <div class="textfx-section collapsed">
+                  <div class="textfx-section-head">
+                    <label class="textfx-toggle-pill">
+                      <input type="checkbox" id="line2-shadow-enabled" onchange="onTextFxSectionToggle('line2','shadow')" />
+                      <span>Drop Shadow</span>
+                    </label>
+                    <button type="button" class="textfx-collapse-btn" id="line2-shadow-collapse" onclick="toggleTextFxSection('line2','shadow')">▾</button>
                   </div>
-                </div>
-                <div class="setting-group">
-                  <label class="setting-label" for="line2-shadow-opacity">Shadow Opacity</label>
-                  <div class="slider-row">
-                    <input type="range" id="line2-shadow-opacity" min="0" max="1" step="0.05" value="0.75"
-                           oninput="onTextFxRangeInput('line2-shadow-opacity','line2-shadow-opacity-val')" />
-                    <span class="slider-value" id="line2-shadow-opacity-val">0.75</span>
-                  </div>
-                </div>
-                <div class="setting-group">
-                  <label class="setting-label" for="line2-stroke-color">Stroke Color</label>
-                  <input type="color" id="line2-stroke-color" value="#000000" onchange="onSettingsChange()" />
-                </div>
-                <div class="setting-group">
-                  <label class="setting-label" for="line2-stroke-width">Stroke Width</label>
-                  <div class="slider-row">
-                    <input type="range" id="line2-stroke-width" min="0" max="4" step="0.1" value="0"
-                           oninput="onTextFxRangeInput('line2-stroke-width','line2-stroke-width-val','px')" />
-                    <span class="slider-value" id="line2-stroke-width-val">0px</span>
+                  <div class="textfx-section-body" id="line2-shadow-section">
+                    <div class="setting-group">
+                      <label class="setting-label" for="line2-shadow-color">Shadow Color</label>
+                      <input type="color" id="line2-shadow-color" value="#000000" onchange="onSettingsChange()" />
+                    </div>
+                    <div class="setting-group">
+                      <label class="setting-label" for="line2-shadow-angle">Direction</label>
+                      <div class="slider-row">
+                        <input type="range" id="line2-shadow-angle" min="0" max="360" step="1" value="120"
+                               oninput="onTextFxRangeInput('line2-shadow-angle','line2-shadow-angle-val','°')" />
+                        <span class="slider-value" id="line2-shadow-angle-val">120°</span>
+                      </div>
+                    </div>
+                    <div class="setting-group">
+                      <label class="setting-label" for="line2-shadow-depth">Depth</label>
+                      <div class="slider-row">
+                        <input type="range" id="line2-shadow-depth" min="0" max="40" step="0.5" value="4"
+                               oninput="onTextFxRangeInput('line2-shadow-depth','line2-shadow-depth-val','px')" />
+                        <span class="slider-value" id="line2-shadow-depth-val">4px</span>
+                      </div>
+                    </div>
+                    <div class="setting-group">
+                      <label class="setting-label" for="line2-shadow-blur">Blur</label>
+                      <div class="slider-row">
+                        <input type="range" id="line2-shadow-blur" min="0" max="40" step="0.5" value="6"
+                               oninput="onTextFxRangeInput('line2-shadow-blur','line2-shadow-blur-val','px')" />
+                        <span class="slider-value" id="line2-shadow-blur-val">6px</span>
+                      </div>
+                    </div>
+                    <div class="setting-group">
+                      <label class="setting-label" for="line2-shadow-opacity">Opacity</label>
+                      <div class="slider-row">
+                        <input type="range" id="line2-shadow-opacity" min="0" max="1" step="0.05" value="0.75"
+                               oninput="onTextFxRangeInput('line2-shadow-opacity','line2-shadow-opacity-val')" />
+                        <span class="slider-value" id="line2-shadow-opacity-val">0.75</span>
+                      </div>
+                    </div>
                   </div>
                 </div>
               </div>
@@ -790,97 +895,177 @@
           </div>
         </div>
 
-        <!-- Lower Third Background Image -->
+              </div>
+            </details>
+          </div>
+        </div>
+        <!-- Custom Image & Logo -->
         <div class="setting-row">
           <div class="setting-group span-full">
-            <label class="setting-label">Lower Third Background Image</label>
-            <div class="file-row">
-              <label class="file-btn" for="lt-bg-file">
-                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="18" height="18" rx="2"/><circle cx="8.5" cy="8.5" r="1.5"/><polyline points="21 15 16 10 5 21"/></svg>
-                Choose Image
-                <input type="file" id="lt-bg-file" accept="image/*" onchange="onLtBgChange()" />
-              </label>
-              <button class="file-clear-btn" id="lt-bg-clear" onclick="clearLtBg()" style="display:none">
-                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
-                Clear
-              </button>
-              <span class="file-name" id="lt-bg-name">No image selected</span>
-            </div>
-            <div class="file-preview-wrap" id="lt-bg-preview-wrap" style="display:none">
-              <img id="lt-bg-preview" class="file-preview-img" alt="Lower third background preview" />
-            </div>
-            <!-- Background image fit/crop controls (shown once an image is loaded) -->
-            <div class="bg-fit-controls" id="bg-fit-controls" style="display:none">
-              <div class="setting-group">
-                <label class="setting-label" for="lt-bg-size">Image Fit</label>
-                <select id="lt-bg-size" onchange="onSettingsChange()">
-                  <option value="cover">Cover (fill, may crop)</option>
-                  <option value="contain">Contain (full image, no crop)</option>
-                  <option value="stretch">Stretch (exact fill)</option>
-                </select>
-              </div>
-              <div class="setting-group">
-                <label class="setting-label" for="lt-bg-position">Vertical Focus</label>
-                <select id="lt-bg-position" onchange="onSettingsChange()">
-                  <option value="center center">Center</option>
-                  <option value="top center">Top</option>
-                  <option value="bottom center">Bottom</option>
-                </select>
-              </div>
-              <div class="setting-group span-full">
-                <label class="setting-label" for="lt-min-height">
-                  Min Bar Height
-                  <span class="label-hint">keeps bar consistent when only 1 line shows</span>
-                </label>
-                <div class="slider-row">
-                  <input type="range" id="lt-min-height" min="0" max="240" step="10" value="0"
-                         oninput="onLtMinHeightInput()" onchange="onSettingsChange()" />
-                  <span class="slider-value" id="lt-min-height-val">auto</span>
+            <details class="settings-subsection">
+              <summary>
+                <span>Custom Image &amp; Logo</span>
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="6 9 12 15 18 9"></polyline></svg>
+              </summary>
+              <div class="settings-subsection-body">
+                <div class="setting-row">
+                  <div class="setting-group span-full">
+                    <label class="setting-label">Lower Third Background Image</label>
+                    <div class="file-row">
+                      <label class="file-btn" for="lt-bg-file">
+                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="18" height="18" rx="2"/><circle cx="8.5" cy="8.5" r="1.5"/><polyline points="21 15 16 10 5 21"/></svg>
+                        Choose Image
+                        <input type="file" id="lt-bg-file" accept="image/*" onchange="onLtBgChange()" />
+                      </label>
+                      <button class="file-clear-btn" id="lt-bg-clear" onclick="clearLtBg()" style="display:none">
+                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
+                        Clear
+                      </button>
+                      <span class="file-name" id="lt-bg-name">No image selected</span>
+                    </div>
+                    <div class="file-preview-wrap" id="lt-bg-preview-wrap" style="display:none">
+                      <img id="lt-bg-preview" class="file-preview-img" alt="Lower third background preview" />
+                    </div>
+                    <div class="bg-fit-controls" id="bg-fit-controls" style="display:none">
+                      <div class="setting-group">
+                        <label class="setting-label" for="lt-bg-size">Image Fit</label>
+                        <select id="lt-bg-size" onchange="onSettingsChange()">
+                          <option value="cover">Cover (fill, may crop)</option>
+                          <option value="contain">Contain (full image, no crop)</option>
+                          <option value="stretch">Stretch (exact fill)</option>
+                        </select>
+                      </div>
+                      <div class="setting-group">
+                        <label class="setting-label" for="lt-bg-position">Vertical Focus</label>
+                        <select id="lt-bg-position" onchange="onSettingsChange()">
+                          <option value="center center">Center</option>
+                          <option value="top center">Top</option>
+                          <option value="bottom center">Bottom</option>
+                        </select>
+                      </div>
+                      <div class="setting-group span-full">
+                        <label class="setting-label" for="lt-min-height">
+                          Min Bar Height
+                          <span class="label-hint">keeps bar consistent when only 1 line shows</span>
+                        </label>
+                        <div class="slider-row">
+                          <input type="range" id="lt-min-height" min="0" max="240" step="10" value="0"
+                                 oninput="onLtMinHeightInput()" onchange="onSettingsChange()" />
+                          <span class="slider-value" id="lt-min-height-val">auto</span>
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+
+                <div class="setting-row">
+                  <div class="setting-group span-full">
+                    <label class="setting-label">Logo (PNG with transparency)</label>
+                    <div class="file-row">
+                      <label class="file-btn" for="logo-file">
+                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16z"/></svg>
+                        Choose Logo
+                        <input type="file" id="logo-file" accept="image/png,image/svg+xml,image/*" onchange="onLogoChange()" />
+                      </label>
+                      <button class="file-clear-btn" id="logo-clear" onclick="clearLogo()" style="display:none">
+                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
+                        Clear
+                      </button>
+                      <span class="file-name" id="logo-name">No logo selected</span>
+                    </div>
+                    <div class="logo-controls" id="logo-controls" style="display:none">
+                      <div class="logo-preview-wrap">
+                        <img id="logo-preview" class="logo-preview-img" alt="Logo preview" />
+                      </div>
+                      <div class="setting-group">
+                        <label class="setting-label" for="logo-position">Logo Position</label>
+                        <select id="logo-position" onchange="onSettingsChange()">
+                          <option value="left">Left side</option>
+                          <option value="right">Right side</option>
+                        </select>
+                      </div>
+                      <div class="setting-group span-full">
+                        <label class="setting-label" for="logo-size">
+                          Logo Size
+                          <span class="label-hint">max height in output</span>
+                        </label>
+                        <div class="slider-row">
+                          <input type="range" id="logo-size" min="40" max="240" step="10" value="110"
+                                 oninput="onLogoSizeInput()" onchange="onSettingsChange()" />
+                          <span class="slider-value" id="logo-size-val">110px</span>
+                        </div>
+                      </div>
+                    </div>
+                  </div>
                 </div>
               </div>
-            </div>
+            </details>
           </div>
         </div>
 
-        <!-- Logo -->
+        <!-- Custom Lower-Third Template Editor -->
         <div class="setting-row">
           <div class="setting-group span-full">
-            <label class="setting-label">Logo (PNG with transparency)</label>
-            <div class="file-row">
-              <label class="file-btn" for="logo-file">
-                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16z"/></svg>
-                Choose Logo
-                <input type="file" id="logo-file" accept="image/png,image/svg+xml,image/*" onchange="onLogoChange()" />
-              </label>
-              <button class="file-clear-btn" id="logo-clear" onclick="clearLogo()" style="display:none">
-                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
-                Clear
-              </button>
-              <span class="file-name" id="logo-name">No logo selected</span>
-            </div>
-            <div class="logo-controls" id="logo-controls" style="display:none">
-              <div class="logo-preview-wrap">
-                <img id="logo-preview" class="logo-preview-img" alt="Logo preview" />
-              </div>
-              <div class="setting-group">
-                <label class="setting-label" for="logo-position">Logo Position</label>
-                <select id="logo-position" onchange="onSettingsChange()">
-                  <option value="left">Left side</option>
-                  <option value="right">Right side</option>
-                </select>
-              </div>
-              <div class="setting-group span-full">
-                <label class="setting-label" for="logo-size">
-                  Logo Size
-                  <span class="label-hint">max height in output</span>
-                </label>
-                <div class="slider-row">
-                  <input type="range" id="logo-size" min="40" max="240" step="10" value="110"
-                         oninput="onLogoSizeInput()" onchange="onSettingsChange()" />
-                  <span class="slider-value" id="logo-size-val">110px</span>
+            <details class="settings-subsection">
+              <summary>
+                <span class="template-section-label">
+                  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="16 18 22 12 16 6"/><polyline points="8 6 2 12 8 18"/></svg>
+                  Custom HTML Template
+                </span>
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="6 9 12 15 18 9"></polyline></svg>
+              </summary>
+              <div class="settings-subsection-body">
+                <div class="template-enable-row">
+                  <label class="template-toggle-label">
+                    <input type="checkbox" id="use-custom-template" onchange="onSettingsChange()" />
+                    Enable custom template (overrides all style settings)
+                  </label>
+                  <div class="template-example-row">
+                    <select id="template-example-select">
+                      <option value="classic">Classic Dark</option>
+                      <option value="bg-image">Background Image</option>
+                      <option value="logo-bar">Logo + Dark Bar</option>
+                      <option value="light">Minimal Light</option>
+                      <option value="scroll">Scripture Scroll</option>
+                    </select>
+                    <button class="btn-reset-template"
+                            onclick="loadTemplate(document.getElementById('template-example-select').value)">
+                      Load Example
+                    </button>
+                  </div>
+                </div>
+                <div class="template-fields">
+                  <div class="template-field-group">
+                    <label class="setting-label">HTML
+                      <span class="label-hint">Variables: &#123;&#123;line1&#125;&#125; &#123;&#123;line2&#125;&#125; &#123;&#123;accentColor&#125;&#125; &#123;&#123;font&#125;&#125; &#123;&#123;line1Font&#125;&#125; &#123;&#123;line2Font&#125;&#125; &#123;&#123;logoUrl&#125;&#125; &#123;&#123;bgUrl&#125;&#125;</span>
+                    </label>
+                    <textarea id="template-html" class="template-textarea" rows="6"
+                      onchange="onSettingsChange()" oninput="onSettingsChange()"
+                      placeholder="<div class=&quot;my-lt&quot;>&#10;  <div class=&quot;line1&quot;>{{line1}}</div>&#10;</div>"></textarea>
+                  </div>
+                  <div class="template-field-group">
+                    <label class="setting-label">CSS</label>
+                    <textarea id="template-css" class="template-textarea" rows="8"
+                      onchange="onSettingsChange()" oninput="onSettingsChange()"
+                      placeholder=".my-lt { background: rgba(0,0,0,.85); padding: 20px; }"></textarea>
+                  </div>
+                </div>
+                <div class="template-preset-row">
+                  <select id="template-preset-select" class="template-preset-select">
+                    <option value="">No template presets yet</option>
+                  </select>
+                  <button class="btn-reset-template" onclick="saveTemplatePreset()" title="Save current custom HTML/CSS as a reusable template preset">
+                    Save Template Preset
+                  </button>
+                  <button class="btn-reset-template" onclick="loadSelectedTemplatePreset()" title="Load selected template preset">
+                    Load Preset
+                  </button>
+                  <button class="btn-reset-template" onclick="deleteSelectedTemplatePreset()" title="Delete selected template preset">
+                    Delete
+                  </button>
                 </div>
               </div>
-            </div>
+            </details>
           </div>
         </div>
 
@@ -890,75 +1075,114 @@
             <label class="setting-label">Output Window</label>
             <label class="template-toggle-label">
               <input type="checkbox" id="show-session-watermark" onchange="onSettingsChange()" />
-              Show session ID watermark on output window (for confirming correct session pairing)
+              Show session ID watermark
+              <span class="inline-help-dot" title="Show session ID watermark on output window (for confirming correct session pairing)">i</span>
             </label>
           </div>
         </div>
-
-        <!-- Custom Lower-Third Template Editor -->
-        <div class="setting-row">
-          <div class="setting-group span-full">
-            <label class="setting-label template-section-label">
-              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="16 18 22 12 16 6"/><polyline points="8 6 2 12 8 18"/></svg>
-              Custom HTML Template
-            </label>
-            <div class="template-enable-row">
-              <label class="template-toggle-label">
-                <input type="checkbox" id="use-custom-template" onchange="onSettingsChange()" />
-                Enable custom template (overrides all style settings)
-              </label>
-              <div class="template-example-row">
-                <select id="template-example-select">
-                  <option value="classic">Classic Dark</option>
-                  <option value="bg-image">Background Image</option>
-                  <option value="logo-bar">Logo + Dark Bar</option>
-                  <option value="light">Minimal Light</option>
-                  <option value="scroll">Scripture Scroll</option>
-                </select>
-                <button class="btn-reset-template"
-                        onclick="loadTemplate(document.getElementById('template-example-select').value)">
-                  Load Example
-                </button>
-              </div>
-            </div>
-            <div class="template-fields">
-              <div class="template-field-group">
-                <label class="setting-label">HTML
-                  <span class="label-hint">Variables: &#123;&#123;line1&#125;&#125; &#123;&#123;line2&#125;&#125; &#123;&#123;accentColor&#125;&#125; &#123;&#123;font&#125;&#125; &#123;&#123;line1Font&#125;&#125; &#123;&#123;line2Font&#125;&#125; &#123;&#123;logoUrl&#125;&#125; &#123;&#123;bgUrl&#125;&#125;</span>
-                </label>
-                <textarea id="template-html" class="template-textarea" rows="6"
-                  onchange="onSettingsChange()" oninput="onSettingsChange()"
-                  placeholder="<div class=&quot;my-lt&quot;>&#10;  <div class=&quot;line1&quot;>{{line1}}</div>&#10;</div>"></textarea>
-              </div>
-              <div class="template-field-group">
-                <label class="setting-label">CSS</label>
-                <textarea id="template-css" class="template-textarea" rows="8"
-                  onchange="onSettingsChange()" oninput="onSettingsChange()"
-                  placeholder=".my-lt { background: rgba(0,0,0,.85); padding: 20px; }"></textarea>
-              </div>
-            </div>
-            <div class="template-preset-row">
-              <select id="template-preset-select" class="template-preset-select">
-                <option value="">No template presets yet</option>
-              </select>
-              <button class="btn-reset-template" onclick="saveTemplatePreset()" title="Save current custom HTML/CSS as a reusable template preset">
-                Save Template Preset
-              </button>
-              <button class="btn-reset-template" onclick="loadSelectedTemplatePreset()" title="Load selected template preset">
-                Load Preset
-              </button>
-              <button class="btn-reset-template" onclick="deleteSelectedTemplatePreset()" title="Delete selected template preset">
-                Delete
-              </button>
-            </div>
-          </div>
-        </div>
-
       </div>
     </details>
 
   </main>
 </div>
+
+<!-- ── In-App User Guide ─────────────────────────────────────────────── -->
+<div id="user-guide-modal" class="guide-modal" aria-hidden="true" role="dialog" aria-labelledby="guide-title">
+  <div class="guide-backdrop" onclick="closeUserGuide()"></div>
+  <div class="guide-dialog" role="document">
+    <div class="guide-header">
+      <h2 id="guide-title">Overlay User Guide</h2>
+      <button class="guide-close" onclick="closeUserGuide()" aria-label="Close guide">×</button>
+    </div>
+    <div class="guide-body">
+      <section class="guide-section">
+        <h3>1. Getting Started</h3>
+        <ol>
+          <li>Open the control panel at <code>/</code> and output window at <code>/output.html?session=&lt;id&gt;</code>.</li>
+          <li>Use the same session ID in control and output.</li>
+          <li>Pick a chroma mode in Settings: <code>Transparent</code> for browser-alpha workflows, or Blue/Green/Magenta for keyed workflows.</li>
+        </ol>
+      </section>
+
+      <section class="guide-section">
+        <h3>2. Live Operation Flow</h3>
+        <ol>
+          <li>Select mode: <code>Bible</code>, <code>Speaker</code>, or <code>Ticker</code>.</li>
+          <li>Set text/data and verify in <code>PVW</code>.</li>
+          <li>Click <code>CUT TO AIR</code> to push to <code>PGM</code> and output.</li>
+          <li>Click <code>CLEAR</code> to remove from air.</li>
+        </ol>
+      </section>
+
+      <section class="guide-section">
+        <h3>3. Bible Mode</h3>
+        <ul>
+          <li>Choose Book, Chapter, Verse(s), Translation, and Reference Language.</li>
+          <li><code>Hide translation line (Line 2)</code> controls whether line 2 shows translation text.</li>
+          <li><code>Look Up Text</code> fetches verse text; <code>Use verse text as line 2</code> uses passage text in output line 2.</li>
+          <li><code>Append translation abbreviation on line 1</code> adds short code like <code>(NASB)</code>.</li>
+        </ul>
+      </section>
+
+      <section class="guide-section">
+        <h3>4. Speaker and Ticker</h3>
+        <ul>
+          <li>Speaker: Enter speaker name and optional title/role.</li>
+          <li>Ticker: Set message, badge label, speed, style, position, and size controls.</li>
+          <li>Ticker runs independently and can stay on air while overlays are cleared.</li>
+        </ul>
+      </section>
+
+      <section class="guide-section">
+        <h3>5. Styling and Templates</h3>
+        <ul>
+          <li><code>Lower Third Style</code> selects built-in looks (classic, gradient, scripture, inline styles, etc.).</li>
+          <li><code>Text Effects (Per Line)</code> lets you control font, weight, size, custom color, stroke, and shadow for each line.</li>
+          <li><code>Custom HTML Template</code> overrides built-in styles completely.</li>
+          <li><code>Custom Image &amp; Logo</code> lets you set bar background image and transparent logos.</li>
+        </ul>
+      </section>
+
+      <section class="guide-section">
+        <h3>6. Presets and Profiles</h3>
+        <ul>
+          <li>Use <code>Save</code> in presets to store Bible/Speaker/Ticker entries.</li>
+          <li><code>Settings Profiles</code> save and restore full session settings globally.</li>
+          <li>Use <code>Export</code>/<code>Import</code> to move presets and profiles between machines.</li>
+        </ul>
+      </section>
+
+      <section class="guide-section">
+        <h3>7. Output Setup and ATEM PNG</h3>
+        <ul>
+          <li><strong>Browser Source tab:</strong> use the output URL in OBS/vMix/Wirecast browser source.</li>
+          <li><strong>ATEM PNG Export tab:</strong>
+            <ul>
+              <li><code>ATEM PNG URL (Premultiplied)</code> is for ATEM media workflows.</li>
+              <li><code>Preview PNG URL (Straight)</code> is for browser visual comparison.</li>
+              <li><code>Regenerate</code> forces immediate PNG re-render.</li>
+            </ul>
+          </li>
+        </ul>
+      </section>
+
+      <section class="guide-section">
+        <h3>8. Keyboard Shortcuts</h3>
+        <p><code>Enter</code> Cut to Air, <code>Esc</code> Clear, <code>B</code> Bible, <code>S</code> Speaker, <code>T</code> Ticker, <code>O</code> Output Window.</p>
+      </section>
+
+      <section class="guide-section">
+        <h3>9. Quick Troubleshooting</h3>
+        <ul>
+          <li>If output does not update, verify session IDs match and WebSocket indicator is online.</li>
+          <li>If text looks different in PNG preview, compare using <code>?alpha=straight</code>.</li>
+          <li>If settings feel cramped, keep sections collapsed and open only the active subsection.</li>
+        </ul>
+      </section>
+    </div>
+  </div>
+</div>
+
 
 <script src="js/data.js"></script>
 <script src="js/control.js"></script>
