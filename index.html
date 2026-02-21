@@ -15,6 +15,20 @@
 </head>
 <body>
 
+<div id="session-modal" class="session-modal" aria-hidden="true" role="dialog" aria-labelledby="session-modal-title">
+  <div class="session-modal-backdrop"></div>
+  <div class="session-modal-dialog" role="document">
+    <h2 id="session-modal-title">Choose Session ID</h2>
+    <p class="session-modal-help">Enter Session ID (letters, numbers, - or _)</p>
+    <input id="session-modal-input" type="text" autocomplete="off" spellcheck="false" maxlength="40" />
+    <div id="session-modal-error" class="session-modal-error" aria-live="polite"></div>
+    <div class="session-modal-actions">
+      <button type="button" class="btn-session" id="session-modal-cancel">Cancel</button>
+      <button type="button" class="btn-settings-toggle" id="session-modal-ok">Continue</button>
+    </div>
+  </div>
+</div>
+
 <div class="app">
 
   <!-- ── Header ──────────────────────────────────────────────────────────── -->

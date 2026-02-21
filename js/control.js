@@ -20,7 +20,68 @@ function makeRandomSessionId() {
   return Math.random().toString(36).slice(2, 9);
 }
 
-function getOrCreateSessionId() {
+function showSessionIdModal(suggested) {
+  return new Promise((resolve) => {
+    const modal = document.getElementById('session-modal');
+    const input = document.getElementById('session-modal-input');
+    const okBtn = document.getElementById('session-modal-ok');
+    const cancelBtn = document.getElementById('session-modal-cancel');
+    const errorEl = document.getElementById('session-modal-error');
+    if (!modal || !input || !okBtn || !cancelBtn || !errorEl) {
+      resolve(suggested);
+      return;
+    }
+
+    input.value = suggested;
+    errorEl.textContent = '';
+    modal.classList.add('open');
+    modal.setAttribute('aria-hidden', 'false');
+    setTimeout(() => {
+      input.focus();
+      input.select();
+    }, 0);
+
+    const cleanup = () => {
+      modal.classList.remove('open');
+      modal.setAttribute('aria-hidden', 'true');
+      okBtn.removeEventListener('click', onOk);
+      cancelBtn.removeEventListener('click', onCancel);
+      input.removeEventListener('keydown', onKeyDown);
+    };
+
+    const onOk = () => {
+      const value = sanitizeSessionId(input.value);
+      if (!value) {
+        errorEl.textContent = 'Please enter a valid Session ID.';
+        input.focus();
+        return;
+      }
+      cleanup();
+      resolve(value);
+    };
+
+    const onCancel = () => {
+      cleanup();
+      resolve(suggested);
+    };
+
+    const onKeyDown = (ev) => {
+      if (ev.key === 'Enter') {
+        ev.preventDefault();
+        onOk();
+      } else if (ev.key === 'Escape') {
+        ev.preventDefault();
+        onCancel();
+      }
+    };
+
+    okBtn.addEventListener('click', onOk);
+    cancelBtn.addEventListener('click', onCancel);
+    input.addEventListener('keydown', onKeyDown);
+  });
+}
+
+async function getOrCreateSessionId() {
   const params = new URLSearchParams(location.search);
   const remembered = (() => {
     try { return sanitizeSessionId(localStorage.getItem('overlayLastSessionId')); } catch (_) { return ''; }
@@ -29,17 +90,7 @@ function getOrCreateSessionId() {
   let id = sanitizeSessionId(params.get('session'));
   if (!id) {
     const suggested = remembered || makeRandomSessionId();
-    let entered = '';
-    while (!entered) {
-      const input = window.prompt('Enter Session ID (letters, numbers, - or _)', suggested);
-      if (input === null) {
-        entered = suggested;
-        break;
-      }
-      entered = sanitizeSessionId(input);
-      if (!entered) window.alert('Please enter a valid Session ID.');
-    }
-    id = entered;
+    id = await showSessionIdModal(suggested);
   }
 
   params.set('session', id);
@@ -47,7 +98,7 @@ function getOrCreateSessionId() {
   try { localStorage.setItem('overlayLastSessionId', id); } catch (_) {}
   return id;
 }
-const SESSION_ID = getOrCreateSessionId();
+let SESSION_ID = '';
 
 // ── State ─────────────────────────────────────────────────────────────────────
 let currentMode    = 'bible';   // 'bible' | 'speaker' | 'ticker'
@@ -79,15 +130,23 @@ let settingsProfiles = [];
 
 // Communication channels (BroadcastChannel primary; localStorage fallback)
 // All keys are namespaced with SESSION_ID so multiple users don't collide.
-const CHANNEL_NAME = 'reference-overlay-' + SESSION_ID;
-const LS_KEY       = 'referenceOverlayState-' + SESSION_ID;
+let CHANNEL_NAME = '';
+let LS_KEY       = '';
 const GLOBAL_TEMPLATE_KEY = 'overlayCustomTemplateGlobal';
-const ATEM_EXPORT_PIN_KEY = 'overlayAtemExportPin-' + SESSION_ID;
+let ATEM_EXPORT_PIN_KEY = '';
 let channel        = null;
 
-try {
-  channel = new BroadcastChannel(CHANNEL_NAME);
-} catch (_) {}
+function configureSessionKeys(sessionId) {
+  SESSION_ID = sessionId;
+  CHANNEL_NAME = 'reference-overlay-' + SESSION_ID;
+  LS_KEY = 'referenceOverlayState-' + SESSION_ID;
+  ATEM_EXPORT_PIN_KEY = 'overlayAtemExportPin-' + SESSION_ID;
+  try {
+    channel = new BroadcastChannel(CHANNEL_NAME);
+  } catch (_) {
+    channel = null;
+  }
+}
 
 // WebSocket client — only active when served via http:// (server.js mode)
 let ws      = null;
@@ -153,7 +212,10 @@ let renderSyncRaf = 0;
 let monitorResizeObserver = null;
 
 // ── Initialise ────────────────────────────────────────────────────────────────
-document.addEventListener('DOMContentLoaded', () => {
+document.addEventListener('DOMContentLoaded', async () => {
+  const sessionId = await getOrCreateSessionId();
+  configureSessionKeys(sessionId);
+
   populateBooks();
   populateTranslations();
   populateReferenceLanguages();

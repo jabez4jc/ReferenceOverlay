@@ -2429,3 +2429,74 @@ kbd {
     gap: 10px;
   }
 }
+
+/* ── Session Modal (Startup) ───────────────────────────────────────────── */
+.session-modal {
+  position: fixed;
+  inset: 0;
+  z-index: 1600;
+  display: none;
+}
+.session-modal.open {
+  display: block;
+}
+.session-modal-backdrop {
+  position: absolute;
+  inset: 0;
+  background: rgba(4, 6, 12, 0.75);
+  backdrop-filter: blur(2px);
+}
+.session-modal-dialog {
+  position: relative;
+  width: min(460px, calc(100vw - 28px));
+  margin: 14vh auto 0;
+  background: var(--surface-2);
+  border: 1px solid var(--border-light);
+  border-radius: 12px;
+  box-shadow: 0 22px 50px rgba(0,0,0,.5);
+  padding: 16px;
+  display: grid;
+  gap: 10px;
+}
+.session-modal-dialog h2 {
+  margin: 0;
+  color: var(--text);
+  font-size: 1rem;
+}
+.session-modal-help {
+  margin: 0;
+  color: var(--text-muted);
+  font-size: .86rem;
+}
+#session-modal-input {
+  width: 100%;
+  border: 1px solid var(--border-light);
+  border-radius: 8px;
+  background: var(--surface);
+  color: var(--text);
+  padding: 10px 11px;
+  font-size: .95rem;
+  outline: none;
+}
+#session-modal-input:focus {
+  border-color: var(--accent);
+  box-shadow: 0 0 0 2px rgba(200,169,81,.2);
+}
+.session-modal-error {
+  min-height: 1.1em;
+  color: #ff6b6b;
+  font-size: .8rem;
+}
+.session-modal-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 8px;
+}
+
+@media (max-width: 700px) {
+  .session-modal-dialog {
+    width: calc(100vw - 14px);
+    margin-top: 8vh;
+    padding: 12px;
+  }
+}
