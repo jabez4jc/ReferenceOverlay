@@ -190,18 +190,30 @@ sudo bash scripts/install_ubuntu_server.sh
 
 ### Coolify
 
+Recommended for reliable ATEM PNG export: **Dockerfile deployment** (not Nixpacks).
+
 - Repo: `https://github.com/jabez4jc/Overlay`
 - Branch: `main`
-- Build: Nixpacks Node
-- Install: `npm ci` (or `npm install`)
-- Start: `npm start`
+- Build Pack: **Dockerfile**
+- Dockerfile Path: `./Dockerfile`
 - Port: `3333`
 
-Notes for ATEM PNG export on Coolify:
-- No manual apt package step is required in normal flow.
-- The app now runs a `postinstall` hook that automatically runs `playwright install chromium` during npm install.
-- If your environment blocks browser download, ATEM PNG endpoints will stay placeholder-only (transparent PNG).
-- You can disable the auto browser download by setting env: `SKIP_PLAYWRIGHT_INSTALL=1`.
+Why Dockerfile mode:
+- Uses Playwright official runtime image with Chromium + required OS libraries preinstalled.
+- Avoids runtime dependency gaps that cause ATEM PNG to stay in placeholder mode.
+
+Coolify settings:
+1. Expose port `3333`.
+2. Add domain (for example `overlay.simplifyed.in`).
+3. Keep persistent storage optional (not required for operation).
+4. Optional env vars:
+   - `ATEM_PNG_MODE=premultiplied`
+   - `ATEM_PNG_SESSIONS=<comma-separated-session-ids>` if you want pre-pinned sessions.
+
+If you still prefer Nixpacks:
+- Keep install command as `npm ci` (do not use `--ignore-scripts`).
+- Ensure postinstall logs show Chromium installed.
+- If browser download is blocked, ATEM export will remain placeholder-only.
 
 ## Troubleshooting
 
