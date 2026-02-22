@@ -197,6 +197,12 @@ sudo bash scripts/install_ubuntu_server.sh
 - Start: `npm start`
 - Port: `3333`
 
+Notes for ATEM PNG export on Coolify:
+- No manual apt package step is required in normal flow.
+- The app now runs a `postinstall` hook that automatically runs `playwright install chromium` during npm install.
+- If your environment blocks browser download, ATEM PNG endpoints will stay placeholder-only (transparent PNG).
+- You can disable the auto browser download by setting env: `SKIP_PLAYWRIGHT_INSTALL=1`.
+
 ## Troubleshooting
 
 - Output not syncing:
