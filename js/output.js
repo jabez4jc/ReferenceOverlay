@@ -530,12 +530,15 @@ function restoreLastState() {
 
 // ── WebSocket Client (server.js mode) ─────────────────────────────────────────
 let ws = null;
-const WS_PORT = parseInt(location.port) || 3333;
 let wsRetryDelay = 5000;   // starts at 5 s; doubles on each failure, caps at 60 s
 
 function initWebSocket() {
   if (location.protocol === 'file:') return;
-  const url = `ws://${location.hostname}:${WS_PORT}?session=${SESSION_ID}&role=output`;
+  const wsProto = location.protocol === 'https:' ? 'wss:' : 'ws:';
+  const wsUrl = new URL(`${wsProto}//${location.host}`);
+  wsUrl.searchParams.set('session', SESSION_ID);
+  wsUrl.searchParams.set('role', 'output');
+  const url = wsUrl.toString();
   try {
     ws = new WebSocket(url);
     ws.onopen    = () => { wsRetryDelay = 5000; };

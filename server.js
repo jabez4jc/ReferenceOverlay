@@ -164,9 +164,20 @@ const server = http.createServer(async (req, res) => {
       : getAtemExportPathForSession(requestedSession);
     fs.readFile(target, (err, data) => {
       if (err) {
-        res.writeHead(404, { 'Content-Type': 'text/plain; charset=utf-8', 'Cache-Control': 'no-store' });
-        res.end('ATEM export not found');
-        return;
+        if (ATEM_PNG_EXPORT_ENABLED) {
+          try {
+            writeTransparentPng(target, ATEM_PNG_WIDTH, ATEM_PNG_HEIGHT);
+            data = fs.readFileSync(target);
+          } catch (_) {
+            res.writeHead(404, { 'Content-Type': 'text/plain; charset=utf-8', 'Cache-Control': 'no-store' });
+            res.end('ATEM export not found');
+            return;
+          }
+        } else {
+          res.writeHead(404, { 'Content-Type': 'text/plain; charset=utf-8', 'Cache-Control': 'no-store' });
+          res.end('ATEM export not found');
+          return;
+        }
       }
       res.writeHead(200, {
         'Content-Type': 'image/png',
@@ -188,9 +199,20 @@ const server = http.createServer(async (req, res) => {
       : getAtemExportPathForSession(requestedSession);
     fs.readFile(target, (err, data) => {
       if (err) {
-        res.writeHead(404, { 'Content-Type': 'text/plain; charset=utf-8', 'Cache-Control': 'no-store' });
-        res.end('ATEM export not found');
-        return;
+        if (ATEM_PNG_EXPORT_ENABLED) {
+          try {
+            writeTransparentPng(target, ATEM_PNG_WIDTH, ATEM_PNG_HEIGHT);
+            data = fs.readFileSync(target);
+          } catch (_) {
+            res.writeHead(404, { 'Content-Type': 'text/plain; charset=utf-8', 'Cache-Control': 'no-store' });
+            res.end('ATEM export not found');
+            return;
+          }
+        } else {
+          res.writeHead(404, { 'Content-Type': 'text/plain; charset=utf-8', 'Cache-Control': 'no-store' });
+          res.end('ATEM export not found');
+          return;
+        }
       }
       res.writeHead(200, {
         'Content-Type': 'image/png',

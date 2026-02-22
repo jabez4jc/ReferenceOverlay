@@ -154,7 +154,6 @@ function configureSessionKeys(sessionId) {
 
 // WebSocket client — only active when served via http:// (server.js mode)
 let ws      = null;
-const WS_PORT = parseInt(location.port) || 3333;
 const FONT_FALLBACK_STACK = "'Noto Sans Devanagari', 'Noto Sans Tamil', 'Noto Sans Telugu', 'Noto Sans Malayalam', 'Noto Sans Kannada', sans-serif";
 const LANGUAGE_DEFAULT_FONT = {
   en: "'Cinzel', serif",
@@ -2869,7 +2868,11 @@ let wsRetryDelay = 5000;   // starts at 5 s; doubles on each failure, caps at 60
 function initWebSocket() {
   if (location.protocol === 'file:') return;   // WS only available on http://
 
-  const url = `ws://${location.hostname}:${WS_PORT}?session=${SESSION_ID}&role=control`;
+  const wsProto = location.protocol === 'https:' ? 'wss:' : 'ws:';
+  const wsUrl = new URL(`${wsProto}//${location.host}`);
+  wsUrl.searchParams.set('session', SESSION_ID);
+  wsUrl.searchParams.set('role', 'control');
+  const url = wsUrl.toString();
   try {
     ws = new WebSocket(url);
     ws.onopen    = () => {
