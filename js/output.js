@@ -213,9 +213,6 @@ window.addEventListener('DOMContentLoaded', () => {
 // ── Message Handler ───────────────────────────────────────────────────────────
 function handleMessage(msg) {
   if (!msg || !msg.action) return;
-  if (msg.action === 'show' || msg.action === 'clear' || msg.action === 'settings' || msg.action === 'show-ticker' || msg.action === 'clear-ticker') {
-    lastStateUpdatedAt = Math.max(lastStateUpdatedAt, Date.now());
-  }
   switch (msg.action) {
     case 'show':
       if (msg.settings) applySettings(msg.settings);
@@ -563,10 +560,9 @@ function initWebSocket() {
 
 async function pollStateSnapshot() {
   if (location.protocol === 'file:') return;
-  if (wsConnected) return;
 
   try {
-    const response = await fetch('/api/state?session=' + encodeURIComponent(SESSION_ID), {
+    const response = await fetch('/api/state?session=' + encodeURIComponent(SESSION_ID) + '&_ts=' + Date.now(), {
       cache: 'no-store',
       headers: { 'Accept': 'application/json' },
     });
@@ -597,5 +593,5 @@ async function pollStateSnapshot() {
 function startStatePolling() {
   if (statePollTimer) return;
   pollStateSnapshot();
-  statePollTimer = setInterval(pollStateSnapshot, 1000);
+  statePollTimer = setInterval(pollStateSnapshot, 750);
 }

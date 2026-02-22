@@ -181,7 +181,7 @@ const server = http.createServer(async (req, res) => {
       updatedAt: state.updatedAt || 0,
       overlayVisible: !!state.overlayVisible,
       tickerVisible: !!state.tickerVisible,
-      settings: settingsMsg?.settings || null,
+      settings: (settingsMsg && typeof settingsMsg === 'object') ? (settingsMsg.settings || settingsMsg) : null,
       show: showMsg?.data || null,
       showTicker: showTickerMsg?.data || null,
     }));
