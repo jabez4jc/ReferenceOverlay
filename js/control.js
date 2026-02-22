@@ -127,12 +127,16 @@ let overlayPresets = [];
 let tickerPresets  = [];
 let templatePresets = [];
 let settingsProfiles = [];
+let overlayModeSettings = { bible: null, speaker: null };
+let defaultOverlayModeSettings = null;
+let activeOverlaySettingsMode = 'bible';
 
 // Communication channels (BroadcastChannel primary; localStorage fallback)
 // All keys are namespaced with SESSION_ID so multiple users don't collide.
 let CHANNEL_NAME = '';
 let LS_KEY       = '';
 const GLOBAL_TEMPLATE_KEY = 'overlayCustomTemplateGlobal';
+const OVERLAY_MODE_SETTINGS_KEY_PREFIX = 'overlayModeSettings-';
 let ATEM_EXPORT_PIN_KEY = '';
 let channel        = null;
 
@@ -220,6 +224,9 @@ document.addEventListener('DOMContentLoaded', async () => {
   populateTranslations();
   populateReferenceLanguages();
   populateFonts();
+  defaultOverlayModeSettings = pickModeDependentSettings(getSettings());
+  overlayModeSettings.bible = JSON.parse(JSON.stringify(defaultOverlayModeSettings));
+  overlayModeSettings.speaker = JSON.parse(JSON.stringify(defaultOverlayModeSettings));
   loadSettings();
   syncBookNameDisplayOption();
   loadPresets();
@@ -638,7 +645,17 @@ function applyLineTextEffects(line1El, line2El, settings) {
 
 // ── Mode Toggle ───────────────────────────────────────────────────────────────
 function setMode(mode) {
+  if (currentMode === 'bible' || currentMode === 'speaker') {
+    storeCurrentModeDependentSettings();
+    activeOverlaySettingsMode = currentMode;
+  }
+
   currentMode = mode;
+
+  if (mode === 'bible' || mode === 'speaker') {
+    activeOverlaySettingsMode = mode;
+    applyModeDependentSettingsToUi(mode);
+  }
 
   document.getElementById('tab-bible').classList.toggle('active', mode === 'bible');
   document.getElementById('tab-speaker').classList.toggle('active', mode === 'speaker');
@@ -737,6 +754,94 @@ function onTickerStyleChange() {
   const custom = document.getElementById('ticker-custom-colors');
   if (custom) custom.classList.toggle('visible', style === 'custom');
   updatePreview();
+}
+
+const MODE_DEPENDENT_SETTING_KEYS = [
+  'style', 'accentColor', 'ltBgColor', 'ltBgOpacity', 'ltWidth',
+  'line2Multiline', 'line2MaxLines', 'position', 'font', 'line1Font',
+  'line2Font', 'textAlign', 'textEffects'
+];
+
+function getOverlayStyleModeForEditing() {
+  if (currentMode === 'bible' || currentMode === 'speaker') return currentMode;
+  return activeOverlaySettingsMode || 'bible';
+}
+
+function pickModeDependentSettings(settings) {
+  const out = {};
+  MODE_DEPENDENT_SETTING_KEYS.forEach((k) => {
+    if (settings[k] !== undefined) out[k] = (k === 'textEffects')
+      ? JSON.parse(JSON.stringify(settings[k]))
+      : settings[k];
+  });
+  return out;
+}
+
+function storeCurrentModeDependentSettings() {
+  const mode = getOverlayStyleModeForEditing();
+  if (mode !== 'bible' && mode !== 'speaker') return;
+  overlayModeSettings[mode] = pickModeDependentSettings(getSettings());
+}
+
+function applyModeDependentSettingsToUi(mode) {
+  const saved = overlayModeSettings[mode] || defaultOverlayModeSettings;
+  if (!saved) return;
+
+  if (saved.style) {
+    const el = document.getElementById('style-select');
+    if (el) el.value = saved.style;
+  }
+  if (saved.accentColor) {
+    const el = document.getElementById('accent-color');
+    if (el) el.value = saved.accentColor;
+  }
+  if (saved.ltBgColor) {
+    const el = document.getElementById('lt-bg-color');
+    if (el) el.value = saved.ltBgColor;
+  }
+  if (saved.ltBgOpacity !== undefined) {
+    const el = document.getElementById('lt-bg-opacity');
+    if (el) el.value = String(saved.ltBgOpacity);
+  }
+  if (saved.ltWidth !== undefined) {
+    const el = document.getElementById('lt-width');
+    if (el) el.value = String(saved.ltWidth);
+  }
+  if (saved.line2Multiline !== undefined) {
+    const el = document.getElementById('line2-multiline');
+    if (el) el.checked = !!saved.line2Multiline;
+  }
+  if (saved.line2MaxLines !== undefined) {
+    const el = document.getElementById('line2-max-lines');
+    if (el) el.value = String(saved.line2MaxLines);
+  }
+  if (saved.position) {
+    const el = document.getElementById('position-select');
+    if (el) el.value = saved.position;
+  }
+
+  const legacyFont = saved.font || "'Cinzel', serif";
+  const line1Sel = document.getElementById('line1-font-select');
+  const line2Sel = document.getElementById('line2-font-select');
+  if (line1Sel) line1Sel.value = saved.line1Font || legacyFont;
+  if (line2Sel) line2Sel.value = saved.line2Font || saved.line1Font || legacyFont;
+
+  if (saved.textAlign) {
+    const r = document.querySelector(`input[name="textAlign"][value="${saved.textAlign}"]`);
+    if (r) r.checked = true;
+  }
+
+  if (saved.textEffects) {
+    setTextEffectsUI(saved.textEffects);
+  } else {
+    populateFontWeightSelect('line1');
+    populateFontWeightSelect('line2');
+  }
+
+  onLtBgOpacityInput();
+  onLtWidthInput();
+  onLine2MaxLinesInput();
+  updateTextEffectLabels();
 }
 
 function updateCutToAirButtonState() {
@@ -1986,6 +2091,7 @@ function buildSessionControlState() {
 function buildSettingsProfilePayload() {
   return {
     settings: getSettings(),
+    overlayModeSettings: cloneJson(overlayModeSettings),
     controlState: buildSessionControlState(),
     overlayPresets: cloneJson(overlayPresets),
     tickerPresets: cloneJson(tickerPresets),
@@ -2145,6 +2251,15 @@ function loadSelectedSettingsProfile() {
   if (!profile || !profile.payload) return;
 
   const payload = profile.payload;
+  if (payload.overlayModeSettings && typeof payload.overlayModeSettings === 'object') {
+    overlayModeSettings = {
+      bible: payload.overlayModeSettings.bible ? cloneJson(payload.overlayModeSettings.bible) : cloneJson(defaultOverlayModeSettings),
+      speaker: payload.overlayModeSettings.speaker ? cloneJson(payload.overlayModeSettings.speaker) : cloneJson(defaultOverlayModeSettings),
+    };
+    try {
+      localStorage.setItem(OVERLAY_MODE_SETTINGS_KEY_PREFIX + SESSION_ID, JSON.stringify(overlayModeSettings));
+    } catch (_) {}
+  }
   overlayPresets = Array.isArray(payload.overlayPresets) ? cloneJson(payload.overlayPresets) : [];
   tickerPresets = Array.isArray(payload.tickerPresets) ? cloneJson(payload.tickerPresets) : [];
   templatePresets = Array.isArray(payload.templatePresets) ? cloneJson(payload.templatePresets) : [];
@@ -2917,8 +3032,20 @@ function onCustomChromaChange() {
 
 function persistSettings(settings) {
   try {
+    const mode = getOverlayStyleModeForEditing();
+    if (mode === 'bible' || mode === 'speaker') {
+      overlayModeSettings[mode] = pickModeDependentSettings(settings);
+      activeOverlaySettingsMode = mode;
+      localStorage.setItem(
+        OVERLAY_MODE_SETTINGS_KEY_PREFIX + SESSION_ID,
+        JSON.stringify(overlayModeSettings)
+      );
+    }
+
     const small = { ...settings, ltBgImage: null, logoDataUrl: null };
+    MODE_DEPENDENT_SETTING_KEYS.forEach((k) => { delete small[k]; });
     localStorage.setItem('overlaySettings-' + SESSION_ID, JSON.stringify(small));
+
     // Keep custom template global so it survives new sessions/tabs.
     if (settings.customTemplate && (settings.customTemplate.html || settings.customTemplate.css)) {
       localStorage.setItem(GLOBAL_TEMPLATE_KEY, JSON.stringify(settings.customTemplate));
@@ -2944,31 +3071,6 @@ function loadSettings() {
     }
 
     if (saved.animation)    document.getElementById('anim-select').value     = saved.animation;
-    if (saved.style)        document.getElementById('style-select').value    = saved.style;
-    if (saved.accentColor)  document.getElementById('accent-color').value    = saved.accentColor;
-    if (saved.ltBgColor)    { const el = document.getElementById('lt-bg-color'); if (el) el.value = saved.ltBgColor; }
-    if (saved.ltBgOpacity !== undefined) {
-      const el = document.getElementById('lt-bg-opacity');
-      if (el) el.value = String(saved.ltBgOpacity);
-    }
-    if (saved.ltWidth !== undefined) {
-      const el = document.getElementById('lt-width');
-      if (el) el.value = String(saved.ltWidth);
-    }
-    if (saved.line2Multiline !== undefined) {
-      const el = document.getElementById('line2-multiline');
-      if (el) el.checked = !!saved.line2Multiline;
-    }
-    if (saved.line2MaxLines !== undefined) {
-      const el = document.getElementById('line2-max-lines');
-      if (el) el.value = String(saved.line2MaxLines);
-    }
-    if (saved.position)     document.getElementById('position-select').value = saved.position;
-    const legacyFont = saved.font || "'Cinzel', serif";
-    const line1Sel = document.getElementById('line1-font-select');
-    const line2Sel = document.getElementById('line2-font-select');
-    if (line1Sel) line1Sel.value = saved.line1Font || legacyFont;
-    if (line2Sel) line2Sel.value = saved.line2Font || saved.line1Font || legacyFont;
     if (saved.outputRes)    document.getElementById('output-res').value      = saved.outputRes;
     if (saved.logoPosition) document.getElementById('logo-position').value   = saved.logoPosition;
 
@@ -2981,12 +3083,6 @@ function loadSettings() {
     if (saved.ltMinHeight !== undefined) {
       const el = document.getElementById('lt-min-height');
       if (el) { el.value = saved.ltMinHeight; document.getElementById('lt-min-height-val').textContent = saved.ltMinHeight > 0 ? saved.ltMinHeight + 'px' : 'auto'; }
-    }
-    setTextEffectsUI(saved.textEffects || DEFAULT_TEXT_EFFECTS);
-
-    if (saved.textAlign) {
-      const r = document.querySelector(`input[name="textAlign"][value="${saved.textAlign}"]`);
-      if (r) r.checked = true;
     }
 
     // Restore custom template
@@ -3017,6 +3113,21 @@ function loadSettings() {
 
     const savedLogo = localStorage.getItem('overlayLogo-' + SESSION_ID);
     if (savedLogo) { logoDataUrl = savedLogo; restoreLogoUI(savedLogo); }
+
+    const storedModeSettings = JSON.parse(localStorage.getItem(OVERLAY_MODE_SETTINGS_KEY_PREFIX + SESSION_ID) || 'null');
+    const fallbackModeSettings = pickModeDependentSettings(saved);
+
+    overlayModeSettings = {
+      bible: storedModeSettings?.bible
+        ? { ...defaultOverlayModeSettings, ...storedModeSettings.bible }
+        : { ...defaultOverlayModeSettings, ...fallbackModeSettings },
+      speaker: storedModeSettings?.speaker
+        ? { ...defaultOverlayModeSettings, ...storedModeSettings.speaker }
+        : { ...defaultOverlayModeSettings, ...fallbackModeSettings },
+    };
+
+    activeOverlaySettingsMode = 'bible';
+    applyModeDependentSettingsToUi('bible');
 
   } catch (_) {}
   updateTextEffectLabels();
