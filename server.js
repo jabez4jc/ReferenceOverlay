@@ -90,6 +90,7 @@ let chromium = null;
 let exportBrowser = null;
 let warnedPlaywrightMissing = false;
 const exportSessions = new Map(); // sessionId -> { context, page, timer, running, queued }
+const sessionState = new Map(); // sessionId -> shared live state (for ws + polling fallback)
 
 try {
   ({ chromium } = require('playwright'));
@@ -149,6 +150,43 @@ const MIME = {
 // ── HTTP Server ───────────────────────────────────────────────────────────────
 const server = http.createServer(async (req, res) => {
   const reqUrl = new URL(req.url || '/', `http://${req.headers.host || 'localhost'}`);
+
+  if (req.method === 'GET' && reqUrl.pathname === '/api/state') {
+    const sessionId = normalizeSessionId(reqUrl.searchParams.get('session') || 'default');
+    const state = sessionState.get(sessionId) || {
+      settings: null,
+      show: null,
+      showTicker: null,
+      overlayVisible: false,
+      tickerVisible: false,
+      updatedAt: 0,
+    };
+    const parsePayload = (raw) => {
+      if (!raw) return null;
+      try { return JSON.parse(raw); } catch (_) { return null; }
+    };
+
+    const settingsMsg = parsePayload(state.settings);
+    const showMsg = parsePayload(state.show);
+    const showTickerMsg = parsePayload(state.showTicker);
+
+    res.writeHead(200, {
+      'Content-Type': 'application/json; charset=utf-8',
+      'Cache-Control': 'no-store, no-cache, must-revalidate, proxy-revalidate, max-age=0',
+      'Pragma': 'no-cache',
+      'Expires': '0',
+    });
+    res.end(JSON.stringify({
+      sessionId,
+      updatedAt: state.updatedAt || 0,
+      overlayVisible: !!state.overlayVisible,
+      tickerVisible: !!state.tickerVisible,
+      settings: settingsMsg?.settings || null,
+      show: showMsg?.data || null,
+      showTicker: showTickerMsg?.data || null,
+    }));
+    return;
+  }
 
   if (req.method === 'GET' && reqUrl.pathname === '/atem-live.png') {
     const rawSession = reqUrl.searchParams.get('session');
@@ -437,7 +475,6 @@ const wss = new WebSocketServer({ server });
 //   so late-joining output clients (OBS Browser Source) always receive the last
 //   live overlay state, not an empty clear.
 const rooms        = new Map();
-const sessionState = new Map();
 
 function getState(sessionId) {
   if (!sessionState.has(sessionId)) {
@@ -447,6 +484,7 @@ function getState(sessionId) {
       showTicker: null,
       overlayVisible: false,
       tickerVisible: false,
+      updatedAt: 0,
     });
   }
   return sessionState.get(sessionId);
@@ -554,17 +592,22 @@ wss.on('connection', (ws, req) => {
         schedulePngExport(requestedSessionId);
       } else if (msg.action === 'settings') {
         state.settings = raw.toString();
+        state.updatedAt = Date.now();
       } else if (msg.action === 'show') {
         state.show = raw.toString();
         if (msg.settings) state.settings = JSON.stringify(msg.settings);
         state.overlayVisible = true;
+        state.updatedAt = Date.now();
       } else if (msg.action === 'clear') {
         state.overlayVisible = false;
+        state.updatedAt = Date.now();
       } else if (msg.action === 'show-ticker') {
         state.showTicker = raw.toString();
         state.tickerVisible = true;
+        state.updatedAt = Date.now();
       } else if (msg.action === 'clear-ticker') {
         state.tickerVisible = false;
+        state.updatedAt = Date.now();
       }
 
       if (msg.action === 'settings' || msg.action === 'show' || msg.action === 'clear' || msg.action === 'show-ticker' || msg.action === 'clear-ticker') {

@@ -34,6 +34,9 @@ const tickerText  = document.getElementById('ticker-text');
 let usingCustomTemplate = false;
 // Tracks the most recently applied settings so showOverlay can access them
 let currentSettings = {};
+let wsConnected = false;
+let statePollTimer = null;
+let lastStateUpdatedAt = 0;
 
 const FONT_FALLBACK_STACK = "'Noto Sans Devanagari', 'Noto Sans Tamil', 'Noto Sans Telugu', 'Noto Sans Malayalam', 'Noto Sans Kannada', sans-serif";
 const DEFAULT_TEXT_EFFECTS = {
@@ -204,11 +207,15 @@ window.addEventListener('DOMContentLoaded', () => {
   applyInitialSettings();
   restoreLastState();
   initWebSocket();
+  startStatePolling();
 });
 
 // ── Message Handler ───────────────────────────────────────────────────────────
 function handleMessage(msg) {
   if (!msg || !msg.action) return;
+  if (msg.action === 'show' || msg.action === 'clear' || msg.action === 'settings' || msg.action === 'show-ticker' || msg.action === 'clear-ticker') {
+    lastStateUpdatedAt = Math.max(lastStateUpdatedAt, Date.now());
+  }
   switch (msg.action) {
     case 'show':
       if (msg.settings) applySettings(msg.settings);
@@ -541,12 +548,54 @@ function initWebSocket() {
   const url = wsUrl.toString();
   try {
     ws = new WebSocket(url);
-    ws.onopen    = () => { wsRetryDelay = 5000; };
+    ws.onopen    = () => { wsConnected = true; wsRetryDelay = 5000; };
     ws.onmessage = e => { try { handleMessage(JSON.parse(e.data)); } catch (_) {} };
     ws.onclose   = () => {
+      wsConnected = false;
       ws = null;
       setTimeout(initWebSocket, wsRetryDelay);
       wsRetryDelay = Math.min(wsRetryDelay * 2, 60000);
     };
+    ws.onerror   = () => { wsConnected = false; };
   } catch (_) {}
+}
+
+
+async function pollStateSnapshot() {
+  if (location.protocol === 'file:') return;
+  if (wsConnected) return;
+
+  try {
+    const response = await fetch('/api/state?session=' + encodeURIComponent(SESSION_ID), {
+      cache: 'no-store',
+      headers: { 'Accept': 'application/json' },
+    });
+    if (!response.ok) return;
+    const state = await response.json();
+    const updatedAt = Number(state.updatedAt || 0);
+    if (!Number.isFinite(updatedAt) || updatedAt <= lastStateUpdatedAt) return;
+
+    if (state.settings) {
+      handleMessage({ action: 'settings', settings: state.settings });
+    }
+    if (state.overlayVisible && state.show) {
+      handleMessage({ action: 'show', data: state.show, settings: state.settings || currentSettings || {} });
+    } else {
+      handleMessage({ action: 'clear' });
+    }
+
+    if (state.tickerVisible && state.showTicker) {
+      handleMessage({ action: 'show-ticker', data: state.showTicker });
+    } else {
+      handleMessage({ action: 'clear-ticker' });
+    }
+
+    lastStateUpdatedAt = updatedAt;
+  } catch (_) {}
+}
+
+function startStatePolling() {
+  if (statePollTimer) return;
+  pollStateSnapshot();
+  statePollTimer = setInterval(pollStateSnapshot, 1000);
 }
