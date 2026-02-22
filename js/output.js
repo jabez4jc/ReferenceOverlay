@@ -34,7 +34,6 @@ const tickerText  = document.getElementById('ticker-text');
 let usingCustomTemplate = false;
 // Tracks the most recently applied settings so showOverlay can access them
 let currentSettings = {};
-let wsConnected = false;
 let statePollTimer = null;
 let lastStateUpdatedAt = 0;
 
@@ -545,15 +544,13 @@ function initWebSocket() {
   const url = wsUrl.toString();
   try {
     ws = new WebSocket(url);
-    ws.onopen    = () => { wsConnected = true; wsRetryDelay = 5000; };
+    ws.onopen    = () => { wsRetryDelay = 5000; };
     ws.onmessage = e => { try { handleMessage(JSON.parse(e.data)); } catch (_) {} };
     ws.onclose   = () => {
-      wsConnected = false;
       ws = null;
       setTimeout(initWebSocket, wsRetryDelay);
       wsRetryDelay = Math.min(wsRetryDelay * 2, 60000);
     };
-    ws.onerror   = () => { wsConnected = false; };
   } catch (_) {}
 }
 
@@ -562,7 +559,7 @@ async function pollStateSnapshot() {
   if (location.protocol === 'file:') return;
 
   try {
-    const response = await fetch('/api/state?session=' + encodeURIComponent(SESSION_ID) + '&_ts=' + Date.now(), {
+    const response = await fetch('/api/state?session=' + encodeURIComponent(SESSION_ID), {
       cache: 'no-store',
       headers: { 'Accept': 'application/json' },
     });
